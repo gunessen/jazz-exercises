@@ -1,0 +1,576 @@
+<title>Play the Interval</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light dark;
+    --ground:#E6E7E2; --surface:#F5F5F2; --sunk:#DBDDD6; --line:#C8CBC3;
+    --ink:#171A20; --muted:#5C6370;
+    --brass:#8E6410; --brass-wash:rgba(142,100,16,.10);
+    --good:#1C6A54; --good-wash:rgba(28,106,84,.12);
+    --miss:#A23824; --miss-wash:rgba(162,56,36,.10);
+    --key-white:#FCFCFA; --key-white-edge:#BFC3BA; --key-black:#242832;
+    --shadow:0 1px 2px rgba(20,25,35,.08), 0 8px 24px rgba(20,25,35,.06);
+    --f-display:"Bodoni Moda", "Didot", Georgia, serif;
+    --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --f-mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#12151C; --surface:#1A1F29; --sunk:#0C0F15; --line:#2C3342;
+      --ink:#E8E7E1; --muted:#8E96A5;
+      --brass:#E2AC46; --brass-wash:rgba(226,172,70,.13);
+      --good:#59C6A2; --good-wash:rgba(89,198,162,.14);
+      --miss:#E5765C; --miss-wash:rgba(229,118,92,.14);
+      --key-white:#C9CCC5; --key-white-edge:#7C8189; --key-black:#171B23;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#12151C; --surface:#1A1F29; --sunk:#0C0F15; --line:#2C3342;
+    --ink:#E8E7E1; --muted:#8E96A5;
+    --brass:#E2AC46; --brass-wash:rgba(226,172,70,.13);
+    --good:#59C6A2; --good-wash:rgba(89,198,162,.14);
+    --miss:#E5765C; --miss-wash:rgba(229,118,92,.14);
+    --key-white:#C9CCC5; --key-white-edge:#7C8189; --key-black:#171B23;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--f-body); font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+  .app {
+    min-height: 100%; display: flex; flex-direction: column; gap: 18px;
+    padding: 18px 20px 22px; max-width: 1140px; margin: 0 auto;
+  }
+
+  /* ---- header ---- */
+  .bar { display: flex; align-items: baseline; gap: 14px 18px; flex-wrap: wrap; }
+  .wordmark { font-family: var(--f-display); font-size: 21px; font-weight: 700; letter-spacing: .01em; margin: 0; }
+  .wordmark em { font-style: italic; font-weight: 500; }
+  .bar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .device {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+    padding: 6px 10px; font-size: 12.5px; max-width: 240px;
+  }
+  .link-btn {
+    background: none; border: 0; padding: 4px 2px; font-size: 12.5px; color: var(--muted);
+    cursor: pointer; border-bottom: 1px solid transparent;
+  }
+  .link-btn:hover { color: var(--ink); border-bottom-color: var(--line); }
+  .status { display: inline-flex; align-items: center; gap: 7px; font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .status[data-on="live"] .dot { background: var(--good); box-shadow: 0 0 0 3px var(--good-wash); }
+  .status[data-on="off"] .dot { background: var(--miss); }
+
+  .notice {
+    border: 1px solid var(--line); border-left: 3px solid var(--brass); background: var(--brass-wash);
+    border-radius: 4px; padding: 10px 14px; font-size: 13px; color: var(--ink);
+  }
+  .notice code { font-family: var(--f-mono); font-size: 12px; }
+
+  /* ---- stage ---- */
+  .stage { display: grid; grid-template-columns: minmax(0,1fr) 210px; gap: 18px; align-items: stretch; }
+  .prompt {
+    position: relative; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: var(--shadow); padding: 22px 26px 24px;
+    display: flex; flex-direction: column; gap: 4px; min-height: 260px;
+  }
+  .prompt[data-verdict="right"] { border-color: var(--good); background: var(--good-wash); }
+  .prompt[data-verdict="wrong"] { border-color: var(--miss); background: var(--miss-wash); }
+  .eyebrow {
+    font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .root {
+    font-family: var(--f-display); font-weight: 500;
+    font-size: clamp(56px, 11vw, 104px); line-height: 1; letter-spacing: -.01em;
+    margin: 6px 0 2px; display: flex; align-items: baseline; gap: .1em;
+  }
+  .root .oct { font-family: var(--f-mono); font-size: .26em; color: var(--muted); letter-spacing: .02em; }
+  .interval {
+    font-size: clamp(19px, 3.4vw, 27px); font-weight: 500; color: var(--brass);
+    text-wrap: balance;
+  }
+  .interval .dir { color: var(--muted); font-weight: 400; }
+  .played {
+    margin-top: auto; padding-top: 14px; display: flex; align-items: center; gap: 10px;
+    font-family: var(--f-mono); font-size: 13.5px; min-height: 34px; flex-wrap: wrap;
+  }
+  .chip-note {
+    display: inline-block; min-width: 46px; text-align: center; padding: 3px 9px;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--ground);
+  }
+  .verdict { font-weight: 600; letter-spacing: .02em; }
+  .verdict[data-v="right"] { color: var(--good); }
+  .verdict[data-v="wrong"] { color: var(--miss); }
+  .hint { color: var(--muted); font-family: var(--f-body); font-size: 13px; }
+
+  /* ---- stats ---- */
+  .stats { display: flex; flex-direction: column; gap: 0; padding-top: 4px; }
+  .stat { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .stat:first-child { border-top: 1px solid var(--line); }
+  .stat dt { font-size: 12.5px; color: var(--muted); }
+  .stat dd { margin: 0; font-family: var(--f-mono); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat.lead dd { font-size: 24px; }
+  .stat-actions { display: flex; gap: 14px; padding-top: 12px; }
+
+  /* ---- keyboard ---- */
+  .kb-wrap { background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 10px 10px 12px; }
+  .kb {
+    position: relative; height: 150px; width: 100%; user-select: none; touch-action: none;
+  }
+  .kb .w, .kb .b { position: absolute; top: 0; border: 0; padding: 0; cursor: pointer; }
+  .kb .w {
+    background: var(--key-white); border: 1px solid var(--key-white-edge); border-top: 0;
+    border-radius: 0 0 4px 4px; height: 100%;
+    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px;
+    font-family: var(--f-mono); font-size: 10px; color: #8A8F86;
+  }
+  .kb .b {
+    background: var(--key-black); border-radius: 0 0 3px 3px; height: 62%; z-index: 2;
+    box-shadow: 0 2px 4px rgba(0,0,0,.35);
+  }
+  .kb .w.held { background: var(--brass); border-color: var(--brass); color: rgba(0,0,0,.45); }
+  .kb .b.held { background: var(--brass); }
+  .kb .w.right, .kb .b.right { background: var(--good); border-color: var(--good); }
+  .kb .w.wrong, .kb .b.wrong { background: var(--miss); border-color: var(--miss); }
+  .kb .w.ghost { box-shadow: inset 0 -6px 0 -1px var(--good); }
+  .kb .b.ghost { box-shadow: inset 0 -6px 0 -1px var(--good), 0 2px 4px rgba(0,0,0,.35); }
+  .kb-legend { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+
+  /* ---- settings ---- */
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 26px; border-top: 1px solid var(--line); padding-top: 16px; }
+  .set-label { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: transparent; border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 11px; font-size: 12.5px; cursor: pointer; color: var(--muted);
+    transition: background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .chip:hover { border-color: var(--brass); color: var(--ink); }
+  .chip[aria-pressed="true"] { background: var(--brass-wash); border-color: var(--brass); color: var(--brass); font-weight: 500; }
+  .chip .semi { font-family: var(--f-mono); font-size: 10.5px; opacity: .65; margin-left: 4px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  @media (max-width: 760px) {
+    .stage { grid-template-columns: 1fr; }
+    .kb { height: 118px; }
+    .app { padding: 14px 16px 18px; }
+  }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <h1 class="wordmark">Play the <em>Interval</em></h1>
+    <div class="bar-right">
+      <span class="status" id="status" data-on="wait"><span class="dot"></span><span id="statusText">connecting</span></span>
+      <select class="device" id="device" aria-label="MIDI input"><option>No MIDI input</option></select>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <main class="stage">
+    <section class="prompt" id="prompt" data-verdict="none" aria-live="polite">
+      <p class="eyebrow" id="counter">Prompt 1</p>
+      <div class="root" id="rootNote"><span>C</span><span class="oct">4</span></div>
+      <p class="interval" id="intervalName">perfect 5th <span class="dir">above</span></p>
+      <div class="played">
+        <span class="chip-note" id="slot1">·</span>
+        <span class="chip-note" id="slot2">·</span>
+        <span class="verdict" id="verdict"></span>
+        <span class="hint" id="hint">Hold both notes together, or play them one after the other.</span>
+      </div>
+    </section>
+
+    <dl class="stats">
+      <div class="stat lead"><dt>Score</dt><dd id="sScore">0/0</dd></div>
+      <div class="stat"><dt>Streak</dt><dd id="sStreak">0</dd></div>
+      <div class="stat"><dt>Best streak</dt><dd id="sBest">0</dd></div>
+      <div class="stat"><dt>Accuracy</dt><dd id="sAcc">—</dd></div>
+      <div class="stat"><dt>Median time</dt><dd id="sTime">—</dd></div>
+      <div class="stat-actions">
+        <button class="link-btn" id="skip">Skip →</button>
+        <button class="link-btn" id="reset">Reset score</button>
+      </div>
+    </dl>
+  </main>
+
+  <div class="kb-wrap">
+    <div class="kb" id="kb"></div>
+    <div class="kb-legend">
+      <span>C3 — B5 · click or play</span>
+      <span id="kbHint">brass = holding</span>
+    </div>
+  </div>
+
+  <footer class="settings">
+    <div>
+      <p class="set-label">Intervals in the pool</p>
+      <div class="chips" id="ivChips"></div>
+    </div>
+    <div>
+      <p class="set-label">Direction</p>
+      <div class="chips" id="dirChips">
+        <button class="chip" data-dir="up">Above the root</button>
+        <button class="chip" data-dir="down">Below the root</button>
+        <button class="chip" data-dir="both">Mixed</button>
+      </div>
+    </div>
+    <div>
+      <p class="set-label">Grading</p>
+      <div class="chips" id="gradeChips">
+        <button class="chip" data-grade="exact">Exact octave</button>
+        <button class="chip" data-grade="any">Any octave</button>
+        <button class="chip" id="soundChip">Sound</button>
+        <button class="chip" id="showChip">Reveal on miss</button>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- music theory ---------- */
+  var LET = ["C","D","E","F","G","A","B"];
+  var LETSEMI = [0,2,4,5,7,9,11];
+  var ROOTS = [
+    {l:0,a:0},{l:1,a:-1},{l:1,a:0},{l:2,a:-1},{l:2,a:0},{l:3,a:0},
+    {l:3,a:1},{l:4,a:-1},{l:4,a:0},{l:5,a:-1},{l:5,a:0},{l:6,a:-1},{l:6,a:0}
+  ];
+  var INTERVALS = [
+    {id:"m2", deg:1, semi:1,  name:"minor 2nd",      short:"m2"},
+    {id:"M2", deg:1, semi:2,  name:"major 2nd",      short:"M2"},
+    {id:"m3", deg:2, semi:3,  name:"minor 3rd",      short:"m3"},
+    {id:"M3", deg:2, semi:4,  name:"major 3rd",      short:"M3"},
+    {id:"P4", deg:3, semi:5,  name:"perfect 4th",    short:"P4"},
+    {id:"TT", deg:3, semi:6,  name:"tritone",        short:"TT"},
+    {id:"P5", deg:4, semi:7,  name:"perfect 5th",    short:"P5"},
+    {id:"m6", deg:5, semi:8,  name:"minor 6th",      short:"m6"},
+    {id:"M6", deg:5, semi:9,  name:"major 6th",      short:"M6"},
+    {id:"m7", deg:6, semi:10, name:"minor 7th",      short:"m7"},
+    {id:"M7", deg:6, semi:11, name:"major 7th",      short:"M7"},
+    {id:"P8", deg:7, semi:12, name:"octave",         short:"P8"}
+  ];
+  var DEFAULT_POOL = ["m2","M2","m3","M3","P4","TT","P5"];
+
+  var LOW = 48, HIGH = 83;                     // C3 .. B5, the drawn range
+  function acc(n) { return n === 0 ? "" : n > 0 ? "♯".repeat(n) : "♭".repeat(-n); }
+  function absOf(l, a, oct) { return 12 * (oct + 1) + LETSEMI[l] + a; }
+
+  // Spell a note a given degree/semitone distance from a spelled root.
+  function spellFrom(root, deg, semi, down) {
+    var step = down ? -deg : deg;
+    var idx = root.l + step;
+    var bump = Math.floor(idx / 7);
+    var tl = ((idx % 7) + 7) % 7;
+    var toct = root.oct + bump;
+    var target = absOf(root.l, root.a, root.oct) + (down ? -semi : semi);
+    var ta = target - (12 * (toct + 1) + LETSEMI[tl]);
+    return { l: tl, a: ta, oct: toct, abs: target };
+  }
+  function label(n) { return LET[n.l] + acc(n.a); }
+  var SHARP = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+  var FLAT  = ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
+  function midiName(m, flat) {
+    return (flat ? FLAT : SHARP)[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+  }
+
+  /* ---------- state ---------- */
+  var pool = DEFAULT_POOL.slice();
+  var dirMode = "up", grade = "exact", sound = true, reveal = true;
+  var held = {}, attempt = [], locked = false, cur = null, nextTimer = null;
+  var stats = { asked: 0, right: 0, streak: 0, best: 0, times: [] };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var kb = $("kb"), keyEls = {};
+
+  /* ---------- keyboard drawing ---------- */
+  (function drawKeys() {
+    var whitePcs = [0,2,4,5,7,9,11];
+    var whites = [];
+    for (var m = LOW; m <= HIGH; m++) if (whitePcs.indexOf(m % 12) >= 0) whites.push(m);
+    var w = 100 / whites.length;
+    whites.forEach(function (m, i) {
+      var b = document.createElement("button");
+      b.className = "w"; b.dataset.note = m; b.type = "button";
+      b.style.left = (i * w) + "%"; b.style.width = w + "%";
+      b.setAttribute("aria-label", midiName(m, false));
+      if (m % 12 === 0) b.textContent = "C" + (Math.floor(m / 12) - 1);
+      kb.appendChild(b); keyEls[m] = b;
+      var pc = (m + 1) % 12;
+      if ([1,3,6,8,10].indexOf(pc) >= 0 && m + 1 <= HIGH) {
+        var k = document.createElement("button");
+        k.className = "b"; k.dataset.note = m + 1; k.type = "button";
+        k.style.left = "calc(" + ((i + 1) * w) + "% - " + (w * 0.29) + "%)";
+        k.style.width = (w * 0.58) + "%";
+        k.setAttribute("aria-label", midiName(m + 1, false));
+        kb.appendChild(k); keyEls[m + 1] = k;
+      }
+    });
+  })();
+
+  function paint() {
+    for (var m in keyEls) {
+      var el = keyEls[m], n = +m;
+      el.classList.toggle("held", !!held[n] && !locked);
+      el.classList.remove("right", "wrong", "ghost");
+    }
+  }
+
+  /* ---------- audio ---------- */
+  var ac = null;
+  function tone(midi, at, dur) {
+    if (!sound) return;
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+    } catch (e) { return; }
+    var t = ac.currentTime + at, f = 440 * Math.pow(2, (midi - 69) / 12);
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    var o1 = ac.createOscillator(), o2 = ac.createOscillator();
+    o1.type = "triangle"; o1.frequency.value = f;
+    o2.type = "sine"; o2.frequency.value = f * 2; 
+    var g2 = ac.createGain(); g2.gain.value = 0.25;
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(ac.destination);
+    o1.start(t); o2.start(t); o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  }
+
+  /* ---------- prompts ---------- */
+  function newPrompt() {
+    var list = INTERVALS.filter(function (i) { return pool.indexOf(i.id) >= 0; });
+    if (!list.length) { list = [INTERVALS[6]]; }
+    var iv = list[Math.floor(Math.random() * list.length)];
+    var down = dirMode === "down" || (dirMode === "both" && Math.random() < 0.5);
+    var root, tgt, guard = 0;
+    do {
+      var r = ROOTS[Math.floor(Math.random() * ROOTS.length)];
+      root = { l: r.l, a: r.a, oct: 3 + Math.floor(Math.random() * 2) };
+      root.abs = absOf(root.l, root.a, root.oct);
+      tgt = spellFrom(root, iv.deg, iv.semi, down);
+    } while (++guard < 60 && (tgt.abs < LOW || tgt.abs > HIGH || root.abs < LOW || root.abs > HIGH));
+
+    cur = { root: root, target: tgt, iv: iv, down: down, t0: performance.now(), flat: root.a < 0 || tgt.a < 0 };
+    locked = false; attempt = [];
+
+    $("counter").textContent = "Prompt " + (stats.asked + 1);
+    $("rootNote").innerHTML = "<span>" + label(root) + "</span><span class=\"oct\">" + root.oct + "</span>";
+    $("intervalName").innerHTML = iv.name + " <span class=\"dir\">" + (down ? "below" : "above") + "</span>";
+    $("prompt").dataset.verdict = "none";
+    $("verdict").textContent = ""; $("verdict").removeAttribute("data-v");
+    $("hint").textContent = grade === "exact"
+      ? "Play " + label(root) + root.oct + " and its " + iv.name + " " + (down ? "below" : "above") + "."
+      : "Any octave counts, as long as the shape is right.";
+    $("slot1").textContent = "·"; $("slot2").textContent = "·";
+    paint();
+  }
+
+  function press(n) {
+    if (n < 0 || n > 127) return;
+    held[n] = true;
+    if (!locked && attempt.indexOf(n) < 0 && attempt.length < 2) {
+      attempt.push(n);
+      $(attempt.length === 1 ? "slot1" : "slot2").textContent = midiName(n, cur.flat);
+      if (attempt.length === 2) judge();
+    }
+    paint();
+  }
+  function release(n) { delete held[n]; paint(); }
+
+  function judge() {
+    locked = true;
+    var lowP = Math.min(attempt[0], attempt[1]), highP = Math.max(attempt[0], attempt[1]);
+    var lowE = Math.min(cur.root.abs, cur.target.abs), highE = Math.max(cur.root.abs, cur.target.abs);
+    var ok;
+    if (grade === "exact") {
+      ok = lowP === lowE && highP === highE;
+    } else {
+      ok = (lowP % 12 === ((lowE % 12) + 12) % 12) &&
+           (highP % 12 === ((highE % 12) + 12) % 12) &&
+           ((highP - lowP) % 12 === (highE - lowE) % 12);
+    }
+    var ms = performance.now() - cur.t0;
+
+    stats.asked++;
+    if (ok) {
+      stats.right++; stats.streak++; stats.times.push(ms);
+      if (stats.streak > stats.best) stats.best = stats.streak;
+    } else { stats.streak = 0; }
+    renderStats();
+
+    $("prompt").dataset.verdict = ok ? "right" : "wrong";
+    var v = $("verdict");
+    v.dataset.v = ok ? "right" : "wrong";
+    v.textContent = ok ? "✓ " + cur.iv.short + "  " + (ms / 1000).toFixed(1) + "s" : "✗ that’s a " + gap(lowP, highP);
+    $("hint").textContent = ok ? "" : (reveal ? "Wanted " + label(cur.root) + cur.root.oct + " + " + label(cur.target) + cur.target.oct + "." : "");
+
+    keyEls[lowP] && keyEls[lowP].classList.add(ok ? "right" : "wrong");
+    keyEls[highP] && keyEls[highP].classList.add(ok ? "right" : "wrong");
+    if (!ok && reveal) {
+      keyEls[lowE] && keyEls[lowE].classList.add("ghost");
+      keyEls[highE] && keyEls[highE].classList.add("ghost");
+    }
+
+    if (ok) { tone(lowP, 0, 1.1); tone(highP, 0, 1.1); }
+    else { tone(cur.root.abs, 0.02, 0.6); tone(cur.target.abs, 0.34, 0.9); }
+
+    clearTimeout(nextTimer);
+    nextTimer = setTimeout(newPrompt, ok ? 900 : 1900);
+  }
+
+  function gap(lo, hi) {
+    var d = hi - lo, base = INTERVALS.filter(function (i) { return i.semi === d % 12 || i.semi === d; })[0];
+    if (d === 0) return "unison";
+    return (base ? base.name : d + " semitones") + (d > 12 ? " + octave" : "");
+  }
+
+  function renderStats() {
+    $("sScore").textContent = stats.right + "/" + stats.asked;
+    $("sStreak").textContent = stats.streak;
+    $("sBest").textContent = stats.best;
+    $("sAcc").textContent = stats.asked ? Math.round(100 * stats.right / stats.asked) + "%" : "—";
+    if (stats.times.length) {
+      var s = stats.times.slice().sort(function (a, b) { return a - b; });
+      $("sTime").textContent = (s[Math.floor(s.length / 2)] / 1000).toFixed(1) + "s";
+    } else { $("sTime").textContent = "—"; }
+  }
+
+  /* ---------- pointer input ---------- */
+  kb.addEventListener("pointerdown", function (e) {
+    var n = e.target.dataset && e.target.dataset.note;
+    if (!n) return;
+    e.target.setPointerCapture(e.pointerId); press(+n);
+  });
+  kb.addEventListener("pointerup", function (e) {
+    var n = e.target.dataset && e.target.dataset.note; if (n) release(+n);
+  });
+  kb.addEventListener("pointercancel", function (e) {
+    var n = e.target.dataset && e.target.dataset.note; if (n) release(+n);
+  });
+
+  /* ---------- Web MIDI ---------- */
+  var access = null, bound = null;
+  function setStatus(state, text) {
+    $("status").dataset.on = state; $("statusText").textContent = text;
+  }
+  function showNotice(html) { var n = $("notice"); n.innerHTML = html; n.hidden = false; }
+
+  function onMessage(e) {
+    var d = e.data, cmd = d[0] & 0xf0;
+    if (cmd === 0x90 && d[2] > 0) press(d[1]);
+    else if (cmd === 0x80 || (cmd === 0x90 && d[2] === 0)) release(d[1]);
+  }
+  function bind() {
+    if (!access) return;
+    access.inputs.forEach(function (i) { i.onmidimessage = null; });
+    var want = $("device").value, any = false;
+    access.inputs.forEach(function (i) {
+      if (want === "all" || i.id === want) { i.onmidimessage = onMessage; any = true; }
+    });
+    bound = any;
+    setStatus(any ? "live" : "off", any ? "listening" : "no input");
+  }
+  function refresh() {
+    var sel = $("device"), prev = sel.value, opts = [];
+    access.inputs.forEach(function (i) { opts.push({ id: i.id, name: i.name || "MIDI input" }); });
+    sel.innerHTML = "";
+    if (!opts.length) {
+      sel.innerHTML = "<option>No MIDI input found</option>";
+      setStatus("off", "no device");
+      return;
+    }
+    var all = document.createElement("option");
+    all.value = "all"; all.textContent = "All inputs (" + opts.length + ")";
+    sel.appendChild(all);
+    opts.forEach(function (o) {
+      var el = document.createElement("option");
+      el.value = o.id; el.textContent = o.name; sel.appendChild(el);
+    });
+    sel.value = (prev && [].slice.call(sel.options).some(function (o) { return o.value === prev; })) ? prev : "all";
+    bind();
+  }
+  $("device").addEventListener("change", bind);
+
+  if (!navigator.requestMIDIAccess) {
+    setStatus("off", "no web midi");
+    showNotice("This browser has no Web MIDI. Chrome, Edge or Opera on desktop support it — the on-screen keyboard below works everywhere.");
+  } else {
+    navigator.requestMIDIAccess({ sysex: false }).then(function (a) {
+      access = a; a.onstatechange = refresh; refresh();
+    }).catch(function (err) {
+      setStatus("off", "midi blocked");
+      showNotice("Web MIDI was blocked here (<code>" + (err && err.name ? err.name : "error") +
+        "</code>). Embedded frames often are — open <code>interval-trainer.html</code> directly in Chrome for hardware input. The on-screen keyboard works either way.");
+    });
+  }
+
+  /* ---------- settings ---------- */
+  var ivChips = $("ivChips");
+  INTERVALS.forEach(function (iv) {
+    var b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.id = "chip-" + iv.id;
+    b.innerHTML = iv.short + "<span class=\"semi\">" + iv.semi + "</span>";
+    b.title = iv.name;
+    b.setAttribute("aria-pressed", pool.indexOf(iv.id) >= 0 ? "true" : "false");
+    b.addEventListener("click", function () {
+      var on = b.getAttribute("aria-pressed") === "true";
+      if (on && pool.length === 1) return;
+      if (on) pool.splice(pool.indexOf(iv.id), 1); else pool.push(iv.id);
+      b.setAttribute("aria-pressed", on ? "false" : "true");
+    });
+    ivChips.appendChild(b);
+  });
+  function group(containerId, key, get, set) {
+    var els = $(containerId).querySelectorAll("[data-" + key + "]");
+    function sync() {
+      [].forEach.call(els, function (e) {
+        e.setAttribute("aria-pressed", e.dataset[key] === get() ? "true" : "false");
+      });
+    }
+    [].forEach.call(els, function (e) {
+      e.addEventListener("click", function () { set(e.dataset[key]); sync(); newPrompt(); });
+    });
+    sync();
+  }
+  group("dirChips", "dir", function () { return dirMode; }, function (v) { dirMode = v; });
+  group("gradeChips", "grade", function () { return grade; }, function (v) { grade = v; });
+
+  function toggle(id, get, set) {
+    var b = $(id);
+    b.setAttribute("aria-pressed", get() ? "true" : "false");
+    b.addEventListener("click", function () { set(!get()); b.setAttribute("aria-pressed", get() ? "true" : "false"); });
+  }
+  toggle("soundChip", function () { return sound; }, function (v) { sound = v; });
+  toggle("showChip", function () { return reveal; }, function (v) { reveal = v; });
+
+  $("skip").addEventListener("click", function () { clearTimeout(nextTimer); newPrompt(); });
+  $("reset").addEventListener("click", function () {
+    stats = { asked: 0, right: 0, streak: 0, best: 0, times: [] };
+    renderStats(); clearTimeout(nextTimer); newPrompt();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === " " || e.key === "Enter") {
+      if (e.target.tagName === "BUTTON" || e.target.tagName === "SELECT") return;
+      e.preventDefault(); clearTimeout(nextTimer); newPrompt();
+    }
+  });
+
+  renderStats();
+  newPrompt();
+})();
+</script>
