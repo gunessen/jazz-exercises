@@ -34,10 +34,14 @@
   .staff .nh { fill: var(--brass); }
   .staff .nh.right { fill: var(--good); }
   .staff .nh.wrong { fill: var(--miss); }
+  .staff .nh.pre-ok { fill: var(--good-pale); }
+  .staff .nh.pre-no { fill: var(--miss-pale); }
   .staff .nh.ghost { fill: none; stroke: var(--good); stroke-width: 1.6; }
   .staff .acc { fill: var(--brass); font-family: "Noto Music", var(--f-body); font-size: 16px; text-anchor: end; }
   .staff .acc.right { fill: var(--good); }
   .staff .acc.wrong { fill: var(--miss); }
+  .staff .acc.pre-ok { fill: var(--good-pale); }
+  .staff .acc.pre-no { fill: var(--miss-pale); }
   .staff .acc.ghost { fill: var(--good); }
 
   .root {
@@ -97,6 +101,8 @@
   }
   .kb .w.held { background: var(--brass); border-color: var(--brass); color: rgba(0,0,0,.45); }
   .kb .b.held { background: var(--brass); }
+  .kb .w.pre-ok, .kb .b.pre-ok { background: var(--good-pale); border-color: var(--good-pale); color: rgba(0,0,0,.45); }
+  .kb .w.pre-no, .kb .b.pre-no { background: var(--miss-pale); border-color: var(--miss-pale); color: rgba(0,0,0,.45); }
   .kb .w.right, .kb .b.right { background: var(--good); border-color: var(--good); }
   .kb .w.wrong, .kb .b.wrong { background: var(--miss); border-color: var(--miss); }
   .kb .w.ghost { box-shadow: inset 0 -6px 0 -1px var(--good); }
@@ -181,6 +187,7 @@
       <div class="stat"><dt>Accuracy</dt><dd id="sAcc">—</dd></div>
       <div class="stat"><dt>Median time</dt><dd id="sTime">—</dd></div>
       <div class="stat-actions">
+        <button class="link-btn" id="show">Show answer</button>
         <button class="link-btn" id="skip">Skip →</button>
         <button class="link-btn" id="reset">Reset score</button>
       </div>
@@ -191,7 +198,7 @@
     <div class="kb" id="kb"></div>
     <div class="kb-legend">
       <span>C3 — B5 · click or play</span>
-      <span id="kbHint">brass = holding</span>
+      <span id="kbHint">first note: green fits · red doesn’t</span>
     </div>
   </div>
 
@@ -224,7 +231,6 @@
         <button class="chip" data-grade="exact">Exact octave</button>
         <button class="chip" data-grade="any">Any octave</button>
         <button class="chip" id="soundChip">Sound</button>
-        <button class="chip" id="showChip">Reveal on miss</button>
       </div>
     </div>
   </footer>
@@ -242,8 +248,8 @@
     {l:3,a:1},{l:4,a:-1},{l:4,a:0},{l:5,a:-1},{l:5,a:0},{l:6,a:-1},{l:6,a:0}
   ];
   var INTERVALS = [
-    {id:"m2", deg:1, semi:1,  name:"minor 2nd",      short:"m2"},
-    {id:"M2", deg:1, semi:2,  name:"major 2nd",      short:"M2"},
+    {id:"m2", deg:1, semi:1,  name:"half-step",      short:"H"},
+    {id:"M2", deg:1, semi:2,  name:"whole-step",     short:"W"},
     {id:"m3", deg:2, semi:3,  name:"minor 3rd",      short:"m3"},
     {id:"M3", deg:2, semi:4,  name:"major 3rd",      short:"M3"},
     {id:"P4", deg:3, semi:5,  name:"perfect 4th",    short:"P4"},
@@ -284,10 +290,11 @@
 
   /* ---------- state ---------- */
   var pool = DEFAULT_POOL.slice();
-  var dirMode = "up", grade = "exact", sound = true, reveal = true;
+  var dirMode = "up", grade = "exact", sound = true;
+  var revealed = false;                       // only ever set by the Show answer button
   var held = {}, attempt = [], locked = false, cur = null;
   var pace = 5000, paceTimer = null;
-  var verdict = null, expected = null;
+  var verdict = null, expected = null, retry = null;
   var stats = { asked: 0, right: 0, streak: 0, best: 0, times: [] };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -318,17 +325,34 @@
     });
   })();
 
+  // A single note can't be graded as an interval, but it can be checked for
+  // membership in the pair we asked for — that is what the pale colors say.
+  function firstOk(n) {
+    if (!cur) return false;
+    var lo = Math.min(cur.root.abs, cur.target.abs), hi = Math.max(cur.root.abs, cur.target.abs);
+    if (grade === "exact") return n === lo || n === hi;
+    var pc = ((n % 12) + 12) % 12;
+    return pc === lo % 12 || pc === hi % 12;
+  }
+  function preClass(n) {
+    if (locked || attempt.length !== 1 || attempt[0] !== n) return "";
+    return firstOk(n) ? "pre-ok" : "pre-no";
+  }
+
   function paint() {
     for (var m in keyEls) {
       var el = keyEls[m], n = +m;
       el.classList.toggle("held", !!held[n] && !locked);
-      el.classList.remove("right", "wrong", "ghost");
+      el.classList.remove("right", "wrong", "ghost", "pre-ok", "pre-no");
+    }
+    if (!locked && attempt.length === 1 && keyEls[attempt[0]]) {
+      keyEls[attempt[0]].classList.add(preClass(attempt[0]));
     }
     if (verdict) {
       attempt.forEach(function (n) { if (keyEls[n]) keyEls[n].classList.add(verdict); });
-      if (verdict === "wrong" && reveal && expected) {
-        expected.forEach(function (n) { if (keyEls[n]) keyEls[n].classList.add("ghost"); });
-      }
+    }
+    if (revealed && expected) {
+      expected.forEach(function (n) { if (keyEls[n]) keyEls[n].classList.add("ghost"); });
     }
     renderStaff();
   }
@@ -354,12 +378,13 @@
   function head(x, y, cls) {
     return '<ellipse class="nh ' + cls + '" cx="' + x + '" cy="' + y + '" rx="6.2" ry="4.6" transform="rotate(-18 ' + x + ' ' + y + ')"/>';
   }
-  function chord(notes, baseX, cls, flat) {
+  function chord(notes, baseX, clsOf, flat) {
     var out = "", placed = [], prev = null;
     notes.map(function (n) {
       var sp = stepOf(n, flat);
-      return { step: sp.step, a: sp.a, y: yOf(sp.step) };
+      return { midi: n, step: sp.step, a: sp.a, y: yOf(sp.step) };
     }).sort(function (a, b) { return a.step - b.step; }).forEach(function (o) {
+      var cls = clsOf(o.midi);
       o.off = (prev && o.step - prev.step <= 1 && !prev.off) ? 1 : 0;   // seconds sit side by side
       prev = o;
       var x = baseX + o.off * DX;
@@ -379,8 +404,8 @@
     var flat = cur ? cur.flat : false, shown = [], k;
     attempt.forEach(function (n) { if (shown.indexOf(n) < 0) shown.push(n); });
     if (!locked) for (k in held) if (shown.indexOf(+k) < 0) shown.push(+k);
-    var out = chord(shown, NX, verdict || "", flat);
-    if (verdict === "wrong" && reveal && expected) out += chord(expected, GX, "ghost", flat);
+    var out = chord(shown, NX, function (n) { return verdict || preClass(n); }, flat);
+    if (revealed && expected) out += chord(expected, GX, function () { return "ghost"; }, flat);
     g.innerHTML = out;
   }
 
@@ -409,20 +434,28 @@
   function newPrompt() {
     var list = INTERVALS.filter(function (i) { return pool.indexOf(i.id) >= 0; });
     if (!list.length) { list = [INTERVALS[6]]; }
-    var iv = list[Math.floor(Math.random() * list.length)];
-    var down = dirMode === "down" || (dirMode === "both" && Math.random() < 0.5);
-    var root, tgt, guard = 0;
-    do {
-      var r = ROOTS[Math.floor(Math.random() * ROOTS.length)];
-      root = { l: r.l, a: r.a, oct: 3 + Math.floor(Math.random() * 2) };
-      root.abs = absOf(root.l, root.a, root.oct);
-      tgt = spellFrom(root, iv.deg, iv.semi, down);
-    } while (++guard < 60 && (tgt.abs < LOW || tgt.abs > HIGH || root.abs < LOW || root.abs > HIGH));
+    var again = retry;
+    retry = null;
+    var iv, down, root, tgt;
+    if (again) {
+      iv = again.iv; down = again.down; root = again.root; tgt = again.target;
+    } else {
+      iv = list[Math.floor(Math.random() * list.length)];
+      down = dirMode === "down" || (dirMode === "both" && Math.random() < 0.5);
+      var guard = 0;
+      do {
+        var r = ROOTS[Math.floor(Math.random() * ROOTS.length)];
+        root = { l: r.l, a: r.a, oct: 3 + Math.floor(Math.random() * 2) };
+        root.abs = absOf(root.l, root.a, root.oct);
+        tgt = spellFrom(root, iv.deg, iv.semi, down);
+      } while (++guard < 60 && (tgt.abs < LOW || tgt.abs > HIGH || root.abs < LOW || root.abs > HIGH));
+    }
 
-    cur = { root: root, target: tgt, iv: iv, down: down, t0: performance.now(), flat: root.a < 0 || tgt.a < 0 };
-    locked = false; attempt = []; verdict = null; expected = null; clearPace();
+    cur = { root: root, target: tgt, iv: iv, down: down, again: !!again, t0: performance.now(), flat: root.a < 0 || tgt.a < 0 };
+    locked = false; attempt = []; verdict = null; revealed = false; clearPace();
+    expected = [Math.min(root.abs, tgt.abs), Math.max(root.abs, tgt.abs)];
 
-    $("counter").textContent = "Prompt " + (stats.asked + 1);
+    $("counter").textContent = "Prompt " + (stats.asked + 1) + (again ? " · same one again" : "");
     $("rootNote").innerHTML = labelHTML(root) + "<span class=\"oct\">" + root.oct + "</span>";
     $("intervalName").innerHTML = iv.name + " <span class=\"dir\">" + (down ? "below" : "above") + "</span>";
     $("prompt").dataset.verdict = "none";
@@ -470,17 +503,17 @@
     renderStats();
 
     verdict = ok ? "right" : "wrong";
-    expected = [lowE, highE];
+    retry = ok ? null : { root: cur.root, target: cur.target, iv: cur.iv, down: cur.down };
     $("prompt").dataset.verdict = verdict;
     var v = $("verdict");
     v.dataset.v = ok ? "right" : "wrong";
     v.textContent = ok ? "✓ " + cur.iv.short + "  " + (ms / 1000).toFixed(1) + "s" : "✗ that’s a " + gap(lowP, highP);
-    $("hint").textContent = ok ? "" : (reveal ? "Wanted " + label(cur.root) + cur.root.oct + " + " + label(cur.target) + cur.target.oct + "." : "");
+    $("hint").textContent = ok ? "" : "Same question comes back — use Show answer if you’re stuck.";
 
     paint();
 
     if (ok) { tone(lowP, 0, 1.1); tone(highP, 0, 1.1); }
-    else { tone(cur.root.abs, 0.02, 0.6); tone(cur.target.abs, 0.34, 0.9); }
+    else { tone(attempt[0], 0.02, 0.6); tone(attempt[1], 0.34, 0.9); }   // what you played, not what was wanted
 
     startPace();
   }
@@ -617,7 +650,7 @@
       });
     }
     [].forEach.call(els, function (e) {
-      e.addEventListener("click", function () { set(e.dataset[key]); sync(); newPrompt(); });
+      e.addEventListener("click", function () { set(e.dataset[key]); sync(); retry = null; newPrompt(); });
     });
     sync();
   }
@@ -631,12 +664,19 @@
     b.addEventListener("click", function () { set(!get()); b.setAttribute("aria-pressed", get() ? "true" : "false"); });
   }
   toggle("soundChip", function () { return sound; }, function (v) { sound = v; });
-  toggle("showChip", function () { return reveal; }, function (v) { reveal = v; });
 
-  $("skip").addEventListener("click", function () { newPrompt(); });
+  $("show").addEventListener("click", function () {
+    if (!cur || revealed) return;
+    revealed = true;
+    $("hint").textContent = "Wanted " + label(cur.root) + cur.root.oct + " + " + label(cur.target) + cur.target.oct + ".";
+    paint();
+    tone(cur.root.abs, 0.02, 0.7);
+    tone(cur.target.abs, 0.38, 1.0);
+  });
+  $("skip").addEventListener("click", function () { retry = null; newPrompt(); });
   $("reset").addEventListener("click", function () {
     stats = { asked: 0, right: 0, streak: 0, best: 0, times: [] };
-    renderStats(); newPrompt();
+    retry = null; renderStats(); newPrompt();
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === " " || e.key === "Enter") {

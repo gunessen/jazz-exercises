@@ -10,6 +10,8 @@
   --good:#1C6A54; --good-wash:rgba(28,106,84,.12);
   --miss:#A23824; --miss-wash:rgba(162,56,36,.10);
   --key-white:#FCFCFA; --key-white-edge:#BFC3BA; --key-black:#242832;
+  /* first-note feedback: light enough to read on a white key in either theme */
+  --good-pale:#A6D4C1; --miss-pale:#EBB2A3;
   --shadow:0 1px 2px rgba(20,25,35,.08), 0 8px 24px rgba(20,25,35,.06);
   --f-display:"Archivo", "Noto Music", system-ui, "Segoe UI", sans-serif;
   --f-body:"IBM Plex Sans", "Noto Music", system-ui, -apple-system, "Segoe UI", sans-serif;
