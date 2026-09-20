@@ -1,0 +1,618 @@
+<title>See the Interval</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Music&text=%E2%99%AD%E2%99%AF%F0%9D%84%9E%F0%9D%84%A2&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  html, body { height: 100%; }
+
+  .app {
+    min-height: 100%; display: flex; flex-direction: column; gap: 18px;
+    padding: 18px 20px 22px; max-width: 1140px; margin: 0 auto;
+  }
+
+  /* ---- stage ---- */
+  .stage { display: grid; grid-template-columns: minmax(0,1fr) 210px; gap: 18px; align-items: stretch; }
+  .prompt {
+    position: relative; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: var(--shadow); padding: 22px 26px 24px;
+    display: flex; flex-direction: column; gap: 4px; min-height: 260px; overflow: hidden;
+  }
+  .prompt-main { display: flex; align-items: center; gap: 14px 26px; flex-wrap: wrap; }
+  .prompt-text { flex: 1 1 260px; min-width: 0; }
+
+  /* ---- the pair ---- */
+  .pair { display: flex; align-items: center; gap: 4px; margin: 6px 0 2px; flex-wrap: wrap; }
+  .slot {
+    flex: 0 0 auto; display: flex; flex-direction: column; gap: 1px; min-width: 2.1em;
+  }
+  .slot .cap {
+    font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .slot .note {
+    font-family: var(--f-display); font-weight: 700;
+    font-size: clamp(38px, 7.2vw, 72px); line-height: 1.04; letter-spacing: -.035em;
+    display: flex; align-items: baseline; gap: .04em; color: var(--brass);
+  }
+  .slot[data-n="2"] .note { color: var(--good); }
+  .slot[data-state="empty"] .note { color: var(--muted); opacity: .45; }
+  .slot .note .acc { font-size: .7em; letter-spacing: 0; }
+  .slot .note .oct { font-family: var(--f-mono); font-size: .26em; color: var(--muted); letter-spacing: .02em; }
+
+  /* the interval sits on a rule drawn between the two notes */
+  .link {
+    flex: 1 1 150px; min-width: 0; position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    text-align: center; padding: 0 4px; align-self: center; margin-top: 12px;
+  }
+  .link::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    border-top: 1px solid var(--line);
+  }
+  .link > * { position: relative; background: var(--surface); padding: 0 9px; max-width: 100%; }
+  .iv-name {
+    font-size: clamp(18px, 3.2vw, 26px); font-weight: 500; color: var(--brass);
+    text-wrap: balance; line-height: 1.2;
+  }
+  .iv-sub { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .06em; color: var(--muted); }
+  .link[data-state="empty"] .iv-name { color: var(--muted); }
+
+  /* ---- staff ---- */
+  .staff { flex: 0 1 330px; width: 330px; max-width: 100%; height: auto; }
+  .staff .stave line { stroke: var(--muted); stroke-width: 1; opacity: .5; }
+  .staff .led { stroke: var(--muted); stroke-width: 1.3; opacity: .85; }
+  .staff .clef { fill: var(--ink); opacity: .8; font-family: "Noto Music", serif; }
+  .staff .clef-label { fill: var(--muted); font-family: var(--f-mono); font-size: 8.5px; letter-spacing: .1em; }
+  .staff .nh { fill: var(--brass); }
+  .staff .nh.two { fill: var(--good); }
+  .staff .acc { fill: var(--brass); font-family: "Noto Music", var(--f-body); font-size: 16px; text-anchor: end; }
+  .staff .acc.two { fill: var(--good); }
+  .staff .span { stroke: var(--brass); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: .55; }
+
+  .played {
+    margin-top: auto; padding-top: 14px; display: flex; align-items: center; gap: 10px;
+    font-family: var(--f-mono); font-size: 13.5px; min-height: 34px; flex-wrap: wrap;
+  }
+  .chip-note {
+    display: inline-block; min-width: 46px; text-align: center; padding: 3px 9px;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--ground);
+  }
+  .chip-note[data-n="1"] { border-color: var(--brass); color: var(--brass); }
+  .chip-note[data-n="2"] { border-color: var(--good); color: var(--good); }
+  .hint { color: var(--muted); font-family: var(--f-body); font-size: 13px; flex: 1 1 200px; }
+
+  /* ---- readout ---- */
+  .stats { display: flex; flex-direction: column; gap: 0; padding-top: 4px; margin: 0; }
+  .stat { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .stat:first-child { border-top: 1px solid var(--line); }
+  .stat dt { font-size: 12.5px; color: var(--muted); }
+  .stat dd { margin: 0; font-family: var(--f-mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  .stat.lead dd { font-size: 24px; color: var(--brass); }
+  .stat-actions { display: flex; gap: 14px; padding-top: 12px; }
+
+  /* ---- keyboard ---- */
+  .kb-wrap { background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 10px 10px 12px; }
+  .kb { position: relative; height: 150px; width: 100%; user-select: none; touch-action: none; }
+  .kb .w, .kb .b { position: absolute; top: 0; border: 0; padding: 0; cursor: pointer; }
+  .kb .w {
+    background: var(--key-white); border: 1px solid var(--key-white-edge); border-top: 0;
+    border-radius: 0 0 4px 4px; height: 100%;
+    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px;
+    font-family: var(--f-mono); font-size: 10px; color: #8A8F86;
+  }
+  .kb .b {
+    background: var(--key-black); border-radius: 0 0 3px 3px; height: 62%; z-index: 2;
+    box-shadow: 0 2px 4px rgba(0,0,0,.35);
+  }
+  .kb .w.held { background: var(--sunk); }
+  .kb .b.held { background: var(--muted); }
+  .kb .w.pick1, .kb .b.pick1 { background: var(--brass); border-color: var(--brass); color: rgba(0,0,0,.45); }
+  .kb .w.pick2, .kb .b.pick2 { background: var(--good); border-color: var(--good); color: rgba(0,0,0,.45); }
+  .kb-legend { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+
+  /* ---- settings ---- */
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 26px; border-top: 1px solid var(--line); padding-top: 16px; }
+  .settings .label { margin-bottom: 8px; }
+
+  @media (max-height: 640px) and (orientation: landscape) {
+    .app { gap: 10px; padding: 10px 16px 12px; }
+    .prompt { min-height: 0; padding: 14px 18px 15px; }
+    .slot .note { font-size: clamp(30px, 8vh, 54px); }
+    .pair { margin: 2px 0 0; }
+    .staff { flex-basis: 250px; width: 250px; }
+    .prompt-main { gap: 10px 18px; }
+    .iv-name { font-size: clamp(15px, 3.2vh, 21px); }
+    .played { padding-top: 9px; min-height: 0; }
+    .kb { height: clamp(86px, 24vh, 132px); }
+    .kb-wrap { padding: 8px 8px 9px; }
+    .kb-legend { margin-top: 5px; }
+    .stat { padding: 5px 0; }
+    .stat.lead dd { font-size: 20px; }
+    .settings { padding-top: 11px; gap: 11px 22px; }
+  }
+  @media (max-width: 760px) {
+    .stage { grid-template-columns: 1fr; }
+    .kb { height: 118px; }
+    .app { padding: 14px 16px 18px; }
+    .link { flex-basis: 110px; }
+  }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <h1 class="wordmark"><a href="index.html">Jazz Exercises</a> · See the <em>Interval</em></h1>
+    <div class="bar-right">
+      <span class="status" id="status" data-on="wait"><span class="dot"></span><span id="statusText">connecting</span></span>
+      <select class="device" id="device" aria-label="MIDI input"><option>No MIDI input</option></select>
+      <button class="chip" id="fs" type="button" aria-pressed="false" hidden>Fullscreen</button>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <main class="stage">
+    <section class="prompt" id="prompt" aria-live="polite">
+      <div class="prompt-main">
+        <div class="prompt-text">
+          <p class="label" id="counter">Play any two notes</p>
+          <div class="pair">
+            <div class="slot" id="slotA" data-n="1" data-state="empty">
+              <span class="cap">first</span>
+              <span class="note" id="noteA">·</span>
+            </div>
+            <div class="link" id="link" data-state="empty">
+              <span class="iv-name" id="ivName">—</span>
+              <span class="iv-sub" id="ivSub">waiting</span>
+            </div>
+            <div class="slot" id="slotB" data-n="2" data-state="empty">
+              <span class="cap">second</span>
+              <span class="note" id="noteB">·</span>
+            </div>
+          </div>
+        </div>
+        <svg class="staff" id="staff" viewBox="0 -12 220 174" aria-hidden="true">
+          <g class="stave">
+            <line x1="8" y1="25" x2="212" y2="25"/><line x1="8" y1="35" x2="212" y2="35"/>
+            <line x1="8" y1="45" x2="212" y2="45"/><line x1="8" y1="55" x2="212" y2="55"/>
+            <line x1="8" y1="65" x2="212" y2="65"/>
+            <line x1="8" y1="85" x2="212" y2="85"/><line x1="8" y1="95" x2="212" y2="95"/>
+            <line x1="8" y1="105" x2="212" y2="105"/><line x1="8" y1="115" x2="212" y2="115"/>
+            <line x1="8" y1="125" x2="212" y2="125"/>
+            <line x1="8" y1="25" x2="8" y2="125"/>
+          </g>
+          <g id="clefs"><text class="clef" x="16" y="55" font-size="40">𝄞</text><text class="clef" x="16" y="95" font-size="40">𝄢</text></g>
+          <g id="staffNotes"></g>
+        </svg>
+      </div>
+      <div class="played">
+        <span class="chip-note" id="slot1" data-n="1">·</span>
+        <span class="chip-note" id="slot2" data-n="2">·</span>
+        <span class="hint" id="hint">Press a key for the first note, then another for the second.</span>
+      </div>
+    </section>
+
+    <dl class="stats">
+      <div class="stat lead"><dt>Interval</dt><dd id="sShort">—</dd></div>
+      <div class="stat"><dt>Semitones</dt><dd id="sSemi">—</dd></div>
+      <div class="stat"><dt>Direction</dt><dd id="sDir">—</dd></div>
+      <div class="stat"><dt>Within an octave</dt><dd id="sSimple">—</dd></div>
+      <div class="stat"><dt>Inversion</dt><dd id="sInv">—</dd></div>
+      <div class="stat-actions">
+        <button class="link-btn" id="replay">Replay ♪</button>
+        <button class="link-btn" id="clear">Clear</button>
+      </div>
+    </dl>
+  </main>
+
+  <div class="kb-wrap">
+    <div class="kb" id="kb"></div>
+    <div class="kb-legend">
+      <span>C3 — B5 · click or play</span>
+      <span>brass = first note · green = second</span>
+    </div>
+  </div>
+
+  <footer class="settings">
+    <div>
+      <p class="label">Note names</p>
+      <div class="chips" id="spellChips">
+        <button class="chip" data-spell="sharp" type="button">Sharps ♯</button>
+        <button class="chip" data-spell="flat" type="button">Flats ♭</button>
+      </div>
+    </div>
+    <div>
+      <p class="label">Sound</p>
+      <div class="chips" id="soundChips">
+        <button class="chip" id="soundChip" type="button">Sound</button>
+        <button class="chip" id="bothChip" type="button">Ring the pair</button>
+      </div>
+    </div>
+    <div>
+      <p class="label">Shortcuts</p>
+      <p class="hint" style="margin:0">Space clears the pair. A third key starts a new pair from that note.</p>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- music theory ---------- */
+  var SIMPLE = [
+    { name: "unison",      short: "P1" },
+    { name: "minor 2nd",   short: "m2" },
+    { name: "major 2nd",   short: "M2" },
+    { name: "minor 3rd",   short: "m3" },
+    { name: "major 3rd",   short: "M3" },
+    { name: "perfect 4th", short: "P4" },
+    { name: "tritone",     short: "TT" },
+    { name: "perfect 5th", short: "P5" },
+    { name: "minor 6th",   short: "m6" },
+    { name: "major 6th",   short: "M6" },
+    { name: "minor 7th",   short: "m7" },
+    { name: "major 7th",   short: "M7" }
+  ];
+  /* one octave out, the jazz names take over */
+  var COMPOUND = [
+    null,
+    { name: "minor 9th",      short: "♭9"  },
+    { name: "major 9th",      short: "9"   },
+    { name: "minor 10th",     short: "m10" },
+    { name: "major 10th",     short: "M10" },
+    { name: "perfect 11th",   short: "11"  },
+    { name: "augmented 11th", short: "♯11" },
+    { name: "perfect 12th",   short: "P12" },
+    { name: "minor 13th",     short: "♭13" },
+    { name: "major 13th",     short: "13"  },
+    { name: "minor 14th",     short: "m14" },
+    { name: "major 14th",     short: "M14" }
+  ];
+
+  var LOW = 48, HIGH = 83;                     // C3 .. B5, the drawn range
+  function acc(n) { return n === 0 ? "" : n > 0 ? "♯".repeat(n) : "♭".repeat(-n); }
+
+  var SHARP = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+  var FLAT  = ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
+  function midiName(m, flat) {
+    return (flat ? FLAT : SHARP)[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+  }
+  function nameHTML(m, flat) {
+    var s = (flat ? FLAT : SHARP)[((m % 12) + 12) % 12], oct = Math.floor(m / 12) - 1;
+    return "<span>" + s.charAt(0) + "</span>" +
+           (s.length > 1 ? "<span class=\"acc\">" + s.slice(1) + "</span>" : "") +
+           "<span class=\"oct\">" + oct + "</span>";
+  }
+
+  // Name the distance between two notes, however many octaves wide it is.
+  function nameGap(d) {
+    var oc = Math.floor(d / 12), s = d % 12;
+    if (d === 0) return { name: "unison", short: "P1" };
+    if (s === 0) {
+      return oc === 1 ? { name: "octave", short: "P8" }
+                      : { name: oc + " octaves", short: oc + "×8ve" };
+    }
+    if (oc === 0) return SIMPLE[s];
+    if (oc === 1) return COMPOUND[s];
+    return { name: SIMPLE[s].name + " + " + oc + " octaves", short: SIMPLE[s].short + "+" + oc + "×8ve" };
+  }
+
+  /* ---------- state ---------- */
+  var flat = false, sound = true, ring = true;
+  var held = {}, n1 = null, n2 = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var kb = $("kb"), keyEls = {};
+
+  /* ---------- keyboard drawing ---------- */
+  (function drawKeys() {
+    var whitePcs = [0,2,4,5,7,9,11];
+    var whites = [];
+    for (var m = LOW; m <= HIGH; m++) if (whitePcs.indexOf(m % 12) >= 0) whites.push(m);
+    var w = 100 / whites.length;
+    whites.forEach(function (m, i) {
+      var b = document.createElement("button");
+      b.className = "w"; b.dataset.note = m; b.type = "button";
+      b.style.left = (i * w) + "%"; b.style.width = w + "%";
+      b.setAttribute("aria-label", midiName(m, false));
+      if (m % 12 === 0) b.textContent = "C" + (Math.floor(m / 12) - 1);
+      kb.appendChild(b); keyEls[m] = b;
+      var pc = (m + 1) % 12;
+      if ([1,3,6,8,10].indexOf(pc) >= 0 && m + 1 <= HIGH) {
+        var k = document.createElement("button");
+        k.className = "b"; k.dataset.note = m + 1; k.type = "button";
+        k.style.left = "calc(" + ((i + 1) * w) + "% - " + (w * 0.29) + "%)";
+        k.style.width = (w * 0.58) + "%";
+        k.setAttribute("aria-label", midiName(m + 1, false));
+        kb.appendChild(k); keyEls[m + 1] = k;
+      }
+    });
+  })();
+
+  function paintKeys() {
+    for (var m in keyEls) {
+      var el = keyEls[m], n = +m;
+      el.classList.toggle("held", !!held[n]);
+      el.classList.toggle("pick1", n === n1);
+      el.classList.toggle("pick2", n !== n1 && n === n2);
+    }
+  }
+
+  /* ---------- staff ---------- */
+  var SPELL_SHARP = [[0,0],[0,1],[1,0],[1,1],[2,0],[3,0],[3,1],[4,0],[4,1],[5,0],[5,1],[6,0]];
+  var SPELL_FLAT  = [[0,0],[1,-1],[1,0],[2,-1],[2,0],[3,0],[4,-1],[4,0],[5,-1],[5,0],[6,-1],[6,0]];
+  var X1 = 110, X2 = 172;
+
+  function stepOf(m) {
+    var pc = ((m % 12) + 12) % 12, sp = (flat ? SPELL_FLAT : SPELL_SHARP)[pc];
+    return { step: (Math.floor(m / 12) - 1) * 7 + sp[0], a: sp[1] };
+  }
+  function yOf(step) { return 75 - (step - 28) * 5; }        // one diatonic step = half a space
+  function ledger(x, y) { return '<line class="led" x1="' + (x - 11) + '" y1="' + y + '" x2="' + (x + 11) + '" y2="' + y + '"/>'; }
+  function ledgersFor(x, y) {
+    var out = "", yl;
+    for (yl = 15; yl >= y - 1; yl -= 10) out += ledger(x, yl);      // above the treble staff
+    for (yl = 135; yl <= y + 1; yl += 10) out += ledger(x, yl);     // below the bass staff
+    if (y === 75) out += ledger(x, y);                              // middle C
+    return out;
+  }
+  function head(x, y, cls) {
+    return '<ellipse class="nh ' + cls + '" cx="' + x + '" cy="' + y + '" rx="6.2" ry="4.6" transform="rotate(-18 ' + x + ' ' + y + ')"/>';
+  }
+  function renderStaff() {
+    var g = $("staffNotes");
+    if (!g) return;
+    var pts = [], out = "";
+    if (n1 !== null) pts.push({ m: n1, x: X1, cls: "" });
+    if (n2 !== null) pts.push({ m: n2, x: X2, cls: "two" });
+    pts.forEach(function (p) {
+      var sp = stepOf(p.m);
+      p.y = yOf(sp.step);
+      out += ledgersFor(p.x, p.y) + head(p.x, p.y, p.cls);
+      if (sp.a) out += '<text class="acc ' + p.cls + '" x="' + (p.x - 10) + '" y="' + (p.y + 5) + '">' + acc(sp.a) + '</text>';
+    });
+    if (pts.length === 2) {                                        // the leap, drawn
+      out = '<line class="span" x1="' + (X1 + 9) + '" y1="' + pts[0].y +
+            '" x2="' + (X2 - 9) + '" y2="' + pts[1].y + '"/>' + out;
+    }
+    g.innerHTML = out;
+  }
+
+  /* ---------- audio ---------- */
+  var ac = null;
+  function tone(midi, at, dur) {
+    if (!sound) return;
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+    } catch (e) { return; }
+    var t = ac.currentTime + at, f = 440 * Math.pow(2, (midi - 69) / 12);
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    var o1 = ac.createOscillator(), o2 = ac.createOscillator();
+    o1.type = "triangle"; o1.frequency.value = f;
+    o2.type = "sine"; o2.frequency.value = f * 2;
+    var g2 = ac.createGain(); g2.gain.value = 0.25;
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(ac.destination);
+    o1.start(t); o2.start(t); o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  }
+  function replay() {
+    if (n1 === null) return;
+    if (n2 === null) { tone(n1, 0, 0.9); return; }
+    tone(n1, 0, 0.6); tone(n2, 0.34, 0.6);
+    tone(n1, 0.78, 1.2); tone(n2, 0.78, 1.2);
+  }
+
+  /* ---------- readout ---------- */
+  function render() {
+    var a = $("slotA"), b = $("slotB"), lk = $("link");
+
+    a.dataset.state = n1 === null ? "empty" : "set";
+    b.dataset.state = n2 === null ? "empty" : "set";
+    $("noteA").innerHTML = n1 === null ? "·" : nameHTML(n1, flat);
+    $("noteB").innerHTML = n2 === null ? "·" : nameHTML(n2, flat);
+    $("slot1").textContent = n1 === null ? "·" : midiName(n1, flat);
+    $("slot2").textContent = n2 === null ? "·" : midiName(n2, flat);
+
+    if (n1 === null) {
+      $("counter").textContent = "Play any two notes";
+      lk.dataset.state = "empty";
+      $("ivName").textContent = "—";
+      $("ivSub").textContent = "waiting";
+      $("hint").textContent = "Press a key for the first note, then another for the second.";
+      setStats("—", "—", "—", "—", "—");
+    } else if (n2 === null) {
+      $("counter").textContent = "First note";
+      lk.dataset.state = "empty";
+      $("ivName").textContent = "?";
+      $("ivSub").textContent = "one to go";
+      $("hint").textContent = "Now play the second note — above, below, or the same note again.";
+      setStats("—", "—", "—", "—", "—");
+    } else {
+      var d = n2 - n1, ad = Math.abs(d);
+      var iv = nameGap(ad), s = ad % 12, oc = Math.floor(ad / 12);
+      var dir = d > 0 ? "above" : d < 0 ? "below" : "same note";
+      var arrow = d > 0 ? "↑" : d < 0 ? "↓" : "=";
+
+      $("counter").textContent = "Interval";
+      lk.dataset.state = "set";
+      $("ivName").textContent = iv.name;
+      $("ivSub").textContent = d === 0 ? "= same note" : arrow + " " + dir;
+      $("hint").textContent = d === 0
+        ? midiName(n1, flat) + " twice — a unison."
+        : midiName(n1, flat) + " " + (d > 0 ? "up" : "down") + " a " + iv.name + " to " + midiName(n2, flat) +
+          " · " + ad + " semitone" + (ad === 1 ? "" : "s") + ".";
+
+      setStats(
+        iv.short,
+        ad + "",
+        d === 0 ? "unison" : arrow + " " + dir,
+        oc === 0 ? "—" : (s === 0 ? "unison" : SIMPLE[s].name),
+        s === 0 ? (ad === 0 ? "octave" : "unison") : SIMPLE[12 - s].name
+      );
+    }
+
+    paintKeys();
+    renderStaff();
+  }
+  function setStats(short, semi, dir, simple, inv) {
+    $("sShort").textContent = short;
+    $("sSemi").textContent = semi;
+    $("sDir").textContent = dir;
+    $("sSimple").textContent = simple;
+    $("sInv").textContent = inv;
+  }
+
+  /* ---------- input ---------- */
+  function press(n) {
+    if (n < 0 || n > 127) return;
+    held[n] = true;
+    var complete = false;
+    if (n1 === null) { n1 = n; n2 = null; }
+    else if (n2 === null) { n2 = n; complete = true; }
+    else { n1 = n; n2 = null; }                 // a third key starts a fresh pair
+    render();
+    if (complete && ring) { tone(n1, 0, 1.1); tone(n2, 0, 1.1); }
+    else tone(n, 0, 0.9);
+  }
+  function release(n) { delete held[n]; paintKeys(); }
+  function clearPair() { n1 = null; n2 = null; render(); }
+
+  kb.addEventListener("pointerdown", function (e) {
+    var n = e.target.dataset && e.target.dataset.note;
+    if (!n) return;
+    e.target.setPointerCapture(e.pointerId); press(+n);
+  });
+  kb.addEventListener("pointerup", function (e) {
+    var n = e.target.dataset && e.target.dataset.note; if (n) release(+n);
+  });
+  kb.addEventListener("pointercancel", function (e) {
+    var n = e.target.dataset && e.target.dataset.note; if (n) release(+n);
+  });
+
+  /* ---------- Web MIDI ---------- */
+  var access = null;
+  function setStatus(state, text) {
+    $("status").dataset.on = state; $("statusText").textContent = text;
+  }
+  function showNotice(html) { var n = $("notice"); n.innerHTML = html; n.hidden = false; }
+
+  function onMessage(e) {
+    var d = e.data, cmd = d[0] & 0xf0;
+    if (cmd === 0x90 && d[2] > 0) press(d[1]);
+    else if (cmd === 0x80 || (cmd === 0x90 && d[2] === 0)) release(d[1]);
+  }
+  function bind() {
+    if (!access) return;
+    access.inputs.forEach(function (i) { i.onmidimessage = null; });
+    var want = $("device").value, any = false;
+    access.inputs.forEach(function (i) {
+      if (want === "all" || i.id === want) { i.onmidimessage = onMessage; any = true; }
+    });
+    setStatus(any ? "live" : "off", any ? "listening" : "no input");
+  }
+  function refresh() {
+    var sel = $("device"), prev = sel.value, opts = [];
+    access.inputs.forEach(function (i) { opts.push({ id: i.id, name: i.name || "MIDI input" }); });
+    sel.innerHTML = "";
+    if (!opts.length) {
+      sel.innerHTML = "<option>No MIDI input found</option>";
+      setStatus("off", "no device");
+      return;
+    }
+    var all = document.createElement("option");
+    all.value = "all"; all.textContent = "All inputs (" + opts.length + ")";
+    sel.appendChild(all);
+    opts.forEach(function (o) {
+      var el = document.createElement("option");
+      el.value = o.id; el.textContent = o.name; sel.appendChild(el);
+    });
+    sel.value = (prev && [].slice.call(sel.options).some(function (o) { return o.value === prev; })) ? prev : "all";
+    bind();
+  }
+  $("device").addEventListener("change", bind);
+
+  if (!navigator.requestMIDIAccess) {
+    setStatus("off", "no web midi");
+    showNotice("This browser has no Web MIDI. Chrome, Edge and Opera have it on desktop and Android; Safari and Firefox don’t. The on-screen keyboard below works everywhere.");
+  } else {
+    navigator.requestMIDIAccess({ sysex: false }).then(function (a) {
+      access = a; a.onstatechange = refresh; refresh();
+    }).catch(function (err) {
+      setStatus("off", "midi blocked");
+      showNotice("Web MIDI was blocked here (<code>" + (err && err.name ? err.name : "error") +
+        "</code>). Sandboxed frames and plain <code>http://</code> addresses both block it — serve this file over <code>https</code>, or from <code>http://localhost</code>. The on-screen keyboard works either way.");
+    });
+  }
+
+  /* ---------- settings ---------- */
+  function group(containerId, key, get, set) {
+    var els = $(containerId).querySelectorAll("[data-" + key + "]");
+    function sync() {
+      [].forEach.call(els, function (e) {
+        e.setAttribute("aria-pressed", e.dataset[key] === get() ? "true" : "false");
+      });
+    }
+    [].forEach.call(els, function (e) {
+      e.addEventListener("click", function () { set(e.dataset[key]); sync(); render(); });
+    });
+    sync();
+  }
+  group("spellChips", "spell", function () { return flat ? "flat" : "sharp"; },
+        function (v) { flat = v === "flat"; });
+
+  function toggle(id, get, set) {
+    var b = $(id);
+    b.setAttribute("aria-pressed", get() ? "true" : "false");
+    b.addEventListener("click", function () { set(!get()); b.setAttribute("aria-pressed", get() ? "true" : "false"); });
+  }
+  toggle("soundChip", function () { return sound; }, function (v) { sound = v; });
+  toggle("bothChip", function () { return ring; }, function (v) { ring = v; });
+
+  $("replay").addEventListener("click", replay);
+  $("clear").addEventListener("click", clearPair);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === " " || e.key === "Backspace") {
+      if (e.target.tagName === "BUTTON" || e.target.tagName === "SELECT") return;
+      e.preventDefault(); clearPair();
+    }
+  });
+
+  var fsBtn = $("fs"), docEl = document.documentElement;
+  var goFs = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+  var endFs = document.exitFullscreen || document.webkitExitFullscreen;
+  function fsOn() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function syncFs() {
+    var on = fsOn();
+    fsBtn.textContent = on ? "Exit fullscreen" : "Fullscreen";
+    fsBtn.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  if (goFs) {
+    fsBtn.hidden = false;
+    fsBtn.addEventListener("click", function () {
+      try { if (fsOn()) { endFs.call(document); } else { var r = goFs.call(docEl); if (r && r.catch) r.catch(function () {}); } }
+      catch (e) { /* refused by the browser — leave the button as it was */ }
+    });
+    document.addEventListener("fullscreenchange", syncFs);
+    document.addEventListener("webkitfullscreenchange", syncFs);
+  }
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      try {
+        if (document.fonts.check('40px "Noto Music"', "𝄞")) return;
+      } catch (e) { /* fall through to labels */ }
+      $("clefs").innerHTML =
+        '<text class="clef-label" x="26" y="48" transform="rotate(-90 26 48)">TREBLE</text>' +
+        '<text class="clef-label" x="26" y="88" transform="rotate(-90 26 88)">BASS</text>';
+    });
+  }
+
+  render();
+})();
+</script>

@@ -18,6 +18,7 @@
   .lede { margin: 0; color: var(--muted); max-width: 46ch; }
 
   .sec + .sec { margin-top: 38px; }
+  .sec .card + .card { margin-top: 14px; }
   .sec .label { margin-bottom: 12px; }
 
   /* planned drills stay flat on purpose — only what you can play gets the lift */
@@ -42,7 +43,7 @@
 <div class="page">
   <header class="masthead">
     <h1>Jazz <em>Exercises</em></h1>
-    <p class="lede">Short drills for the MIDI keyboard. Play the answer on the keys, get scored on accuracy and speed.</p>
+    <p class="lede">Short exercises for the MIDI keyboard. Some drill you against the clock; others just show you what your hands are playing.</p>
   </header>
 
   <section class="sec">
@@ -56,6 +57,17 @@
         <span class="pill">above &amp; below</span>
         <span class="pill">exact or any octave</span>
         <span class="pill">timed</span>
+      </div>
+    </a>
+    <a class="card" href="interval-explorer.html">
+      <h2>See the Interval <span class="go" aria-hidden="true">&rarr;</span></h2>
+      <p>No drill and no score. Play a note, then another, and the page names both of them, sets them on the grand staff and tells you the interval between them.</p>
+      <div class="pills">
+        <span class="pill on">Web MIDI</span>
+        <span class="pill">grand staff</span>
+        <span class="pill">above, below or unison</span>
+        <span class="pill">compound intervals</span>
+        <span class="pill">no scoring</span>
       </div>
     </a>
   </section>
