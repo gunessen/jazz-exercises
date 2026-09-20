@@ -1,4 +1,4 @@
-<title>Play the Interval</title>
+<title>Find the Note</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,7 +26,7 @@
   .prompt-text { flex: 1 1 200px; min-width: 0; }
 
   /* ---- staff ---- */
-  .staff { flex: 0 1 310px; width: 310px; max-width: 100%; height: auto; max-height: 300px; }
+  .staff { flex: 0 1 310px; width: 310px; max-width: 100%; height: auto; }
   .staff .stave line { stroke: var(--muted); stroke-width: 1; opacity: .5; }
   .staff .led { stroke: var(--muted); stroke-width: 1.3; opacity: .85; }
   .staff .clef { fill: var(--ink); opacity: .8; font-family: "Noto Music", serif; }
@@ -34,28 +34,23 @@
   .staff .nh { fill: var(--brass); }
   .staff .nh.right { fill: var(--good); }
   .staff .nh.wrong { fill: var(--miss); }
-  .staff .nh.pre-ok { fill: var(--good-pale); }
-  .staff .nh.pre-no { fill: var(--miss-pale); }
   .staff .nh.ghost { fill: none; stroke: var(--good); stroke-width: 1.6; }
   .staff .acc { fill: var(--brass); font-family: "Noto Music", var(--f-body); font-size: 16px; text-anchor: end; }
   .staff .acc.right { fill: var(--good); }
   .staff .acc.wrong { fill: var(--miss); }
-  .staff .acc.pre-ok { fill: var(--good-pale); }
-  .staff .acc.pre-no { fill: var(--miss-pale); }
   .staff .acc.ghost { fill: var(--good); }
 
+  /* ---- the asked note ---- */
   .root {
     font-family: var(--f-display); font-weight: 700;
-    font-size: clamp(56px, 11vw, 104px); line-height: 1.02; letter-spacing: -.035em;
-    margin: 6px 0 2px; display: flex; align-items: baseline; gap: .06em;
+    font-size: clamp(76px, 16vw, 148px); line-height: 1; letter-spacing: -.04em;
+    margin: 2px 0 4px; display: flex; align-items: baseline; gap: .04em;
   }
-  .root .acc { font-size: .7em; letter-spacing: 0; }
-  .root .oct { font-family: var(--f-mono); font-size: .26em; color: var(--muted); letter-spacing: .02em; }
-  .interval {
-    font-size: clamp(19px, 3.4vw, 27px); font-weight: 500; color: var(--brass);
-    text-wrap: balance;
-  }
-  .interval .dir { color: var(--muted); font-weight: 400; }
+  .root .acc { font-size: .68em; letter-spacing: 0; }
+  .root .oct { font-family: var(--f-mono); font-size: .2em; color: var(--muted); letter-spacing: .02em; }
+  .sub { font-size: clamp(15px, 2.6vw, 19px); color: var(--muted); margin: 0; text-wrap: balance; }
+  .sub em { font-style: normal; color: var(--brass); }
+
   .played {
     margin-top: auto; padding-top: 14px; display: flex; align-items: center; gap: 10px;
     font-family: var(--f-mono); font-size: 13.5px; min-height: 34px; flex-wrap: wrap;
@@ -85,9 +80,7 @@
 
   /* ---- keyboard ---- */
   .kb-wrap { background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 10px 10px 12px; }
-  .kb {
-    position: relative; height: 150px; width: 100%; user-select: none; touch-action: none;
-  }
+  .kb { position: relative; height: 150px; width: 100%; user-select: none; touch-action: none; }
   .kb .w, .kb .b { position: absolute; top: 0; border: 0; padding: 0; cursor: pointer; }
   .kb .w {
     background: var(--key-white); border: 1px solid var(--key-white-edge); border-top: 0;
@@ -101,8 +94,6 @@
   }
   .kb .w.held { background: var(--brass); border-color: var(--brass); color: rgba(0,0,0,.45); }
   .kb .b.held { background: var(--brass); }
-  .kb .w.pre-ok, .kb .b.pre-ok { background: var(--good-pale); border-color: var(--good-pale); color: rgba(0,0,0,.45); }
-  .kb .w.pre-no, .kb .b.pre-no { background: var(--miss-pale); border-color: var(--miss-pale); color: rgba(0,0,0,.45); }
   .kb .w.right, .kb .b.right { background: var(--good); border-color: var(--good); }
   .kb .w.wrong, .kb .b.wrong { background: var(--miss); border-color: var(--miss); }
   .kb .w.ghost { box-shadow: inset 0 -6px 0 -1px var(--good); }
@@ -110,17 +101,16 @@
   .kb-legend { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
 
   /* ---- settings ---- */
-  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 26px; border-top: 1px solid var(--line); padding-top: 16px; }
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px 26px; border-top: 1px solid var(--line); padding-top: 16px; }
   .settings .label { margin-bottom: 8px; }
 
-  /* ---- tablet landscape: browser chrome eats the top, so compact everything ---- */
   @media (max-height: 640px) and (orientation: landscape) {
     .app { gap: 10px; padding: 10px 16px 12px; }
     .prompt { min-height: 0; padding: 14px 18px 15px; }
-    .root { font-size: clamp(40px, 9vh, 68px); margin: 2px 0 0; }
-    .staff { flex-basis: 230px; width: 230px; max-height: 34vh; }
+    .root { font-size: clamp(48px, 13vh, 96px); margin: 0; }
+    .staff { flex-basis: 230px; width: 230px; }
     .prompt-main { gap: 10px 18px; }
-    .interval { font-size: clamp(16px, 3.4vh, 22px); }
+    .sub { font-size: clamp(13px, 2.8vh, 17px); }
     .played { padding-top: 9px; min-height: 0; }
     .kb { height: clamp(86px, 24vh, 132px); }
     .kb-wrap { padding: 8px 8px 9px; }
@@ -138,7 +128,7 @@
 
 <div class="app">
   <header class="bar">
-    <h1 class="wordmark"><a href="index.html">Jazz Exercises</a> · Play the <em>Interval</em></h1>
+    <h1 class="wordmark"><a href="index.html">Jazz Exercises</a> · Find the <em>Note</em></h1>
     <div class="bar-right">
       <span class="status" id="status" data-on="wait"><span class="dot"></span><span id="statusText">connecting</span></span>
       <select class="device" id="device" aria-label="MIDI input"><option>No MIDI input</option></select>
@@ -153,8 +143,8 @@
       <div class="prompt-main">
         <div class="prompt-text">
           <p class="label" id="counter">Prompt 1</p>
-          <div class="root" id="rootNote"><span>C</span><span class="oct">4</span></div>
-          <p class="interval" id="intervalName">perfect 5th <span class="dir">above</span></p>
+          <div class="root" id="askNote"><span>C</span><span class="oct">4</span></div>
+          <p class="sub" id="sub">Play it — one key, no thinking.</p>
         </div>
         <svg class="staff" id="staff" viewBox="0 0 210 150" aria-hidden="true">
           <g class="stave">
@@ -166,15 +156,14 @@
             <line x1="8" y1="125" x2="202" y2="125"/>
             <line x1="8" y1="25" x2="8" y2="125"/>
           </g>
-          <g id="clefs"><text class="clef" x="16" y="55" font-size="40">𝄞</text><text class="clef" x="16" y="95" font-size="40">𝄢</text></g>
+          <g id="clefs"><text class="clef" x="16" y="55" font-size="40">&#119070;</text><text class="clef" x="16" y="95" font-size="40">&#119074;</text></g>
           <g id="staffNotes"></g>
         </svg>
       </div>
       <div class="played">
-        <span class="chip-note" id="slot1">·</span>
-        <span class="chip-note" id="slot2">·</span>
+        <span class="chip-note" id="slot1">&middot;</span>
         <span class="verdict" id="verdict"></span>
-        <span class="hint" id="hint">Hold both notes together, or play them one after the other.</span>
+        <span class="hint" id="hint"></span>
         <span class="count" id="count" aria-hidden="true" hidden></span>
       </div>
       <div class="pace" id="pace" aria-hidden="true" hidden><i id="paceBar"></i></div>
@@ -184,11 +173,11 @@
       <div class="stat lead"><dt>Score</dt><dd id="sScore">0/0</dd></div>
       <div class="stat"><dt>Streak</dt><dd id="sStreak">0</dd></div>
       <div class="stat"><dt>Best streak</dt><dd id="sBest">0</dd></div>
-      <div class="stat"><dt>Accuracy</dt><dd id="sAcc">—</dd></div>
-      <div class="stat"><dt>Median time</dt><dd id="sTime">—</dd></div>
+      <div class="stat"><dt>Accuracy</dt><dd id="sAcc">&mdash;</dd></div>
+      <div class="stat"><dt>Median time</dt><dd id="sTime">&mdash;</dd></div>
       <div class="stat-actions">
         <button class="link-btn" id="show">Show answer</button>
-        <button class="link-btn" id="skip">Skip →</button>
+        <button class="link-btn" id="skip">Skip &rarr;</button>
         <button class="link-btn" id="reset">Reset score</button>
       </div>
     </dl>
@@ -197,30 +186,26 @@
   <div class="kb-wrap">
     <div class="kb" id="kb"></div>
     <div class="kb-legend">
-      <span id="kbRange">C3 — B5 · click or play</span>
-      <span id="kbHint">first note: green fits · red doesn’t</span>
+      <span id="kbRange">C3 &mdash; B5 &middot; click or play</span>
+      <span id="kbHint">one key ends the prompt</span>
     </div>
   </div>
 
   <footer class="settings">
     <div>
-      <p class="label">Intervals in the pool</p>
-      <div class="chips" id="ivChips"></div>
-    </div>
-    <div>
-      <p class="label">Direction</p>
-      <div class="chips" id="dirChips">
-        <button class="chip" data-dir="up">Above the root</button>
-        <button class="chip" data-dir="down">Below the root</button>
-        <button class="chip" data-dir="both">Mixed</button>
+      <p class="label">Notes in the pool</p>
+      <div class="chips" id="poolChips">
+        <button class="chip" data-group="nat" type="button">Naturals</button>
+        <button class="chip" data-group="sharp" type="button">Sharps &#9839;</button>
+        <button class="chip" data-group="flat" type="button">Flats &#9837;</button>
       </div>
     </div>
     <div>
-      <p class="label">Octaves for the root</p>
+      <p class="label">Octaves</p>
       <div class="chips" id="octChips">
-        <button class="chip" data-oct="1" type="button">1 · C4</button>
-        <button class="chip" data-oct="2" type="button">2 · C3–B4</button>
-        <button class="chip" data-oct="3" type="button">3 · C3–B5</button>
+        <button class="chip" data-oct="1" type="button">1 &middot; C4</button>
+        <button class="chip" data-oct="2" type="button">2 &middot; C3&ndash;B4</button>
+        <button class="chip" data-oct="3" type="button">3 &middot; C3&ndash;B5</button>
       </div>
     </div>
     <div>
@@ -236,9 +221,9 @@
     <div>
       <p class="label">Grading</p>
       <div class="chips" id="gradeChips">
-        <button class="chip" data-grade="exact">Exact octave</button>
-        <button class="chip" data-grade="any">Any octave</button>
-        <button class="chip" id="soundChip">Sound</button>
+        <button class="chip" data-grade="exact" type="button">Exact octave</button>
+        <button class="chip" data-grade="any" type="button">Any octave</button>
+        <button class="chip" id="soundChip" type="button">Sound</button>
       </div>
     </div>
   </footer>
@@ -251,41 +236,15 @@
   /* ---------- music theory ---------- */
   var LET = ["C","D","E","F","G","A","B"];
   var LETSEMI = [0,2,4,5,7,9,11];
-  var ROOTS = [
-    {l:0,a:0},{l:1,a:-1},{l:1,a:0},{l:2,a:-1},{l:2,a:0},{l:3,a:0},
-    {l:3,a:1},{l:4,a:-1},{l:4,a:0},{l:5,a:-1},{l:5,a:0},{l:6,a:-1},{l:6,a:0}
-  ];
-  var INTERVALS = [
-    {id:"m2", deg:1, semi:1,  name:"half-step",      short:"H"},
-    {id:"M2", deg:1, semi:2,  name:"whole-step",     short:"W"},
-    {id:"m3", deg:2, semi:3,  name:"minor 3rd",      short:"m3"},
-    {id:"M3", deg:2, semi:4,  name:"major 3rd",      short:"M3"},
-    {id:"P4", deg:3, semi:5,  name:"perfect 4th",    short:"P4"},
-    {id:"TT", deg:3, semi:6,  name:"tritone",        short:"TT"},
-    {id:"P5", deg:4, semi:7,  name:"perfect 5th",    short:"P5"},
-    {id:"m6", deg:5, semi:8,  name:"minor 6th",      short:"m6"},
-    {id:"M6", deg:5, semi:9,  name:"major 6th",      short:"M6"},
-    {id:"m7", deg:6, semi:10, name:"minor 7th",      short:"m7"},
-    {id:"M7", deg:6, semi:11, name:"major 7th",      short:"M7"},
-    {id:"P8", deg:7, semi:12, name:"octave",         short:"P8"}
-  ];
-  var DEFAULT_POOL = ["m2","M2","m3","M3","P4","TT","P5"];
+  var GROUPS = {
+    nat:   [{l:0,a:0},{l:1,a:0},{l:2,a:0},{l:3,a:0},{l:4,a:0},{l:5,a:0},{l:6,a:0}],
+    sharp: [{l:0,a:1},{l:1,a:1},{l:3,a:1},{l:4,a:1},{l:5,a:1}],
+    flat:  [{l:1,a:-1},{l:2,a:-1},{l:4,a:-1},{l:5,a:-1},{l:6,a:-1}]
+  };
+  var OCT_SETS = { 1: [4], 2: [3,4], 3: [3,4,5] };
 
-  var OCT_SETS = { 1: [4], 2: [3,4], 3: [3,4,5] };   // root octaves per setting
   function acc(n) { return n === 0 ? "" : n > 0 ? "♯".repeat(n) : "♭".repeat(-n); }
   function absOf(l, a, oct) { return 12 * (oct + 1) + LETSEMI[l] + a; }
-
-  // Spell a note a given degree/semitone distance from a spelled root.
-  function spellFrom(root, deg, semi, down) {
-    var step = down ? -deg : deg;
-    var idx = root.l + step;
-    var bump = Math.floor(idx / 7);
-    var tl = ((idx % 7) + 7) % 7;
-    var toct = root.oct + bump;
-    var target = absOf(root.l, root.a, root.oct) + (down ? -semi : semi);
-    var ta = target - (12 * (toct + 1) + LETSEMI[tl]);
-    return { l: tl, a: ta, oct: toct, abs: target };
-  }
   function label(n) { return LET[n.l] + acc(n.a); }
   function labelHTML(n) {
     return "<span>" + LET[n.l] + "</span>" + (n.a ? "<span class=\"acc\">" + acc(n.a) + "</span>" : "");
@@ -297,35 +256,32 @@
   }
 
   /* ---------- state ---------- */
-  var pool = DEFAULT_POOL.slice();
-  var dirMode = "up", grade = "exact", sound = true, octaves = 2;
-  var revealed = false;                       // only ever set by the Show answer button
-  var held = {}, attempt = [], locked = false, cur = null;
+  var groups = ["nat", "sharp", "flat"];
+  var octaves = 2, grade = "exact", sound = true;
   var pace = 3000, RIGHT_WAIT = 500, paceTimer = null;
-  var verdict = null, expected = null, retry = null;
+  var revealed = false, locked = false, cur = null, answer = null, retry = null;
+  var held = {}, verdict = null;
   var stats = { asked: 0, right: 0, streak: 0, best: 0, times: [] };
 
   var $ = function (id) { return document.getElementById(id); };
   var kb = $("kb"), keyEls = {};
-  var kbLo = 48, kbHi = 83;
+  var kbLo = 48, kbHi = 71;
 
   /* ---------- range ---------- */
-  // Roots come from whole octaves of C; the drawn keys add an octave of room
-  // on whichever side the interval can run off to, so the answer is always there.
+  // The pool is whole octaves of C; the keys drawn are exactly that universe,
+  // so every note you are asked for is on screen and nothing else is.
   function setRange() {
     var o = OCT_SETS[octaves];
-    var uLo = 12 * (o[0] + 1), uHi = 12 * (o[o.length - 1] + 1) + 11;
-    kbLo = dirMode === "up" ? uLo : uLo - 12;
-    kbHi = dirMode === "down" ? uHi : uHi + 12;
+    kbLo = 12 * (o[0] + 1);
+    kbHi = 12 * (o[o.length - 1] + 1) + 11;
     drawKeys();
   }
 
   /* ---------- keyboard drawing ---------- */
   function drawKeys() {
     kb.innerHTML = ""; keyEls = {}; held = {};
-    var whitePcs = [0,2,4,5,7,9,11];
-    var whites = [];
-    for (var m = kbLo; m <= kbHi; m++) if (whitePcs.indexOf(((m % 12) + 12) % 12) >= 0) whites.push(m);
+    var whitePcs = [0,2,4,5,7,9,11], whites = [], m;
+    for (m = kbLo; m <= kbHi; m++) if (whitePcs.indexOf(((m % 12) + 12) % 12) >= 0) whites.push(m);
     var w = 100 / whites.length;
     whites.forEach(function (m, i) {
       var b = document.createElement("button");
@@ -348,35 +304,14 @@
     fitStaff();
   }
 
-  // A single note can't be graded as an interval, but it can be checked for
-  // membership in the pair we asked for — that is what the pale colors say.
-  function firstOk(n) {
-    if (!cur) return false;
-    var lo = Math.min(cur.root.abs, cur.target.abs), hi = Math.max(cur.root.abs, cur.target.abs);
-    if (grade === "exact") return n === lo || n === hi;
-    var pc = ((n % 12) + 12) % 12;
-    return pc === lo % 12 || pc === hi % 12;
-  }
-  function preClass(n) {
-    if (locked || attempt.length !== 1 || attempt[0] !== n) return "";
-    return firstOk(n) ? "pre-ok" : "pre-no";
-  }
-
   function paint() {
     for (var m in keyEls) {
       var el = keyEls[m], n = +m;
       el.classList.toggle("held", !!held[n] && !locked);
-      el.classList.remove("right", "wrong", "ghost", "pre-ok", "pre-no");
+      el.classList.remove("right", "wrong", "ghost");
     }
-    if (!locked && attempt.length === 1 && keyEls[attempt[0]]) {
-      keyEls[attempt[0]].classList.add(preClass(attempt[0]));
-    }
-    if (verdict) {
-      attempt.forEach(function (n) { if (keyEls[n]) keyEls[n].classList.add(verdict); });
-    }
-    if (revealed && expected) {
-      expected.forEach(function (n) { if (keyEls[n]) keyEls[n].classList.add("ghost"); });
-    }
+    if (verdict && answer !== null && keyEls[lastPlayed]) keyEls[lastPlayed].classList.add(verdict);
+    if (revealed && cur && keyEls[cur.abs]) keyEls[cur.abs].classList.add("ghost");
     renderStaff();
   }
 
@@ -390,8 +325,8 @@
     return { step: (Math.floor(m / 12) - 1) * 7 + sp[0], a: sp[1] };
   }
   function yOf(step) { return 75 - (step - 28) * 5; }        // one diatonic step = half a space
-  // The drawn range moves with the settings, so grow the box to keep the
-  // ledger lines of the outermost notes inside it.
+  // The drawn range moves with the octave setting, so the box grows to keep
+  // the ledger lines of the outer notes inside it.
   function fitStaff() {
     var ys = [];
     [kbLo, kbHi].forEach(function (m) {
@@ -437,10 +372,10 @@
     var g = $("staffNotes");
     if (!g) return;
     var flat = cur ? cur.flat : false, shown = [], k;
-    attempt.forEach(function (n) { if (shown.indexOf(n) < 0) shown.push(n); });
+    if (answer !== null) shown.push(answer);
     if (!locked) for (k in held) if (shown.indexOf(+k) < 0) shown.push(+k);
-    var out = chord(shown, NX, function (n) { return verdict || preClass(n); }, flat);
-    if (revealed && expected) out += chord(expected, GX, function () { return "ghost"; }, flat);
+    var out = chord(shown, NX, function () { return verdict || ""; }, flat);
+    if (revealed && cur) out += chord([cur.abs], GX, function () { return "ghost"; }, flat);
     g.innerHTML = out;
   }
 
@@ -459,75 +394,68 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     var o1 = ac.createOscillator(), o2 = ac.createOscillator();
     o1.type = "triangle"; o1.frequency.value = f;
-    o2.type = "sine"; o2.frequency.value = f * 2; 
+    o2.type = "sine"; o2.frequency.value = f * 2;
     var g2 = ac.createGain(); g2.gain.value = 0.25;
     o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(ac.destination);
     o1.start(t); o2.start(t); o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
   }
 
   /* ---------- prompts ---------- */
+  function spellings() {
+    var out = [];
+    groups.forEach(function (g) { out = out.concat(GROUPS[g]); });
+    return out.length ? out : GROUPS.nat;
+  }
+  var lastAbs = -1, lastPlayed = -1;
+
   function newPrompt() {
-    var list = INTERVALS.filter(function (i) { return pool.indexOf(i.id) >= 0; });
-    if (!list.length) { list = [INTERVALS[6]]; }
     var again = retry;
     retry = null;
-    var iv, down, root, tgt;
+    var note;
     if (again) {
-      iv = again.iv; down = again.down; root = again.root; tgt = again.target;
+      note = again;
     } else {
-      iv = list[Math.floor(Math.random() * list.length)];
-      down = dirMode === "down" || (dirMode === "both" && Math.random() < 0.5);
-      var octs = OCT_SETS[octaves], guard = 0;
+      var list = spellings(), octs = OCT_SETS[octaves], guard = 0;
       do {
-        var r = ROOTS[Math.floor(Math.random() * ROOTS.length)];
-        root = { l: r.l, a: r.a, oct: octs[Math.floor(Math.random() * octs.length)] };
-        root.abs = absOf(root.l, root.a, root.oct);
-        tgt = spellFrom(root, iv.deg, iv.semi, down);
-      } while (++guard < 60 && (tgt.abs < kbLo || tgt.abs > kbHi));
+        var s = list[Math.floor(Math.random() * list.length)];
+        var oct = octs[Math.floor(Math.random() * octs.length)];
+        note = { l: s.l, a: s.a, oct: oct, abs: absOf(s.l, s.a, oct) };
+      } while (++guard < 24 && list.length * octs.length > 1 && note.abs === lastAbs);
     }
+    lastAbs = note.abs;
 
-    cur = { root: root, target: tgt, iv: iv, down: down, again: !!again, t0: performance.now(), flat: root.a < 0 || tgt.a < 0 };
-    locked = false; attempt = []; verdict = null; revealed = false; clearPace();
-    expected = [Math.min(root.abs, tgt.abs), Math.max(root.abs, tgt.abs)];
+    cur = { l: note.l, a: note.a, oct: note.oct, abs: note.abs, flat: note.a < 0, t0: performance.now() };
+    locked = false; verdict = null; revealed = false; answer = null; lastPlayed = -1;
+    held = {}; clearPace();
 
     $("counter").textContent = "Prompt " + (stats.asked + 1) + (again ? " · same one again" : "");
-    $("rootNote").innerHTML = labelHTML(root) + "<span class=\"oct\">" + root.oct + "</span>";
-    $("intervalName").innerHTML = iv.name + " <span class=\"dir\">" + (down ? "below" : "above") + "</span>";
+    $("askNote").innerHTML = labelHTML(cur) + (grade === "exact" ? "<span class=\"oct\">" + cur.oct + "</span>" : "");
+    $("sub").textContent = grade === "exact"
+      ? "Play it — one key, no thinking."
+      : "Any octave — just find the key.";
     $("prompt").dataset.verdict = "none";
     $("verdict").textContent = ""; $("verdict").removeAttribute("data-v");
-    $("hint").textContent = grade === "exact"
-      ? "Play " + label(root) + root.oct + " and its " + iv.name + " " + (down ? "below" : "above") + "."
-      : "Any octave counts, as long as the shape is right.";
-    $("slot1").textContent = "·"; $("slot2").textContent = "·";
+    $("hint").textContent = "";
+    $("slot1").textContent = "·";
     paint();
   }
 
   function press(n) {
     if (n < 0 || n > 127) return;
     held[n] = true;
-    var full = false;
-    if (!locked && attempt.indexOf(n) < 0 && attempt.length < 2) {
-      attempt.push(n);
-      $(attempt.length === 1 ? "slot1" : "slot2").textContent = midiName(n, cur.flat);
-      full = attempt.length === 2;
-    }
-    paint();
-    if (full) judge();
+    if (locked) { paint(); return; }
+    tone(n, 0, 0.5);
+    answer = n; lastPlayed = n;
+    $("slot1").textContent = midiName(n, cur.flat);
+    judge(n);
   }
   function release(n) { delete held[n]; paint(); }
 
-  function judge() {
+  function judge(n) {
     locked = true;
-    var lowP = Math.min(attempt[0], attempt[1]), highP = Math.max(attempt[0], attempt[1]);
-    var lowE = Math.min(cur.root.abs, cur.target.abs), highE = Math.max(cur.root.abs, cur.target.abs);
-    var ok;
-    if (grade === "exact") {
-      ok = lowP === lowE && highP === highE;
-    } else {
-      ok = (lowP % 12 === ((lowE % 12) + 12) % 12) &&
-           (highP % 12 === ((highE % 12) + 12) % 12) &&
-           ((highP - lowP) % 12 === (highE - lowE) % 12);
-    }
+    var ok = grade === "exact"
+      ? n === cur.abs
+      : ((n % 12) + 12) % 12 === ((cur.abs % 12) + 12) % 12;
     var ms = performance.now() - cur.t0;
 
     stats.asked++;
@@ -538,21 +466,21 @@
     renderStats();
 
     verdict = ok ? "right" : "wrong";
-    retry = ok ? null : { root: cur.root, target: cur.target, iv: cur.iv, down: cur.down };
+    retry = ok ? null : { l: cur.l, a: cur.a, oct: cur.oct, abs: cur.abs };
     $("prompt").dataset.verdict = verdict;
     var v = $("verdict");
-    v.dataset.v = ok ? "right" : "wrong";
-    v.textContent = ok ? "✓ " + cur.iv.short + "  " + (ms / 1000).toFixed(1) + "s" : "✗ that’s a " + gap(lowP, highP);
-    $("hint").textContent = ok ? "" : "Same question comes back — use Show answer if you’re stuck.";
+    v.dataset.v = verdict;
+    v.textContent = ok
+      ? "✓ " + (ms / 1000).toFixed(1) + "s"
+      : "✗ that’s " + midiName(n, cur.flat);
+    $("hint").textContent = ok ? "" : "Wanted " + label(cur) + cur.oct + " — same note comes back.";
 
     paint();
-
-    if (ok) { tone(lowP, 0, 1.1); tone(highP, 0, 1.1); }
-    else { tone(attempt[0], 0.02, 0.6); tone(attempt[1], 0.34, 0.9); }   // what you played, not what was wanted
-
+    if (!ok) tone(cur.abs, 0.45, 0.9);      // hear the one you were after
     startPace(ok);
   }
 
+  /* ---------- pacing ---------- */
   function clearPace() {
     if (paceTimer) { clearInterval(paceTimer); paceTimer = null; }
     $("pace").hidden = true; $("count").hidden = true;
@@ -575,12 +503,6 @@
     }
     tick();
     paceTimer = setInterval(tick, 50);
-  }
-
-  function gap(lo, hi) {
-    var d = hi - lo, base = INTERVALS.filter(function (i) { return i.semi === d % 12 || i.semi === d; })[0];
-    if (d === 0) return "unison";
-    return (base ? base.name : d + " semitones") + (d > 12 ? " + octave" : "");
   }
 
   function renderStats() {
@@ -608,7 +530,7 @@
   });
 
   /* ---------- Web MIDI ---------- */
-  var access = null, bound = null;
+  var access = null;
   function setStatus(state, text) {
     $("status").dataset.on = state; $("statusText").textContent = text;
   }
@@ -626,7 +548,6 @@
     access.inputs.forEach(function (i) {
       if (want === "all" || i.id === want) { i.onmidimessage = onMessage; any = true; }
     });
-    bound = any;
     setStatus(any ? "live" : "off", any ? "listening" : "no input");
   }
   function refresh() {
@@ -664,21 +585,6 @@
   }
 
   /* ---------- settings ---------- */
-  var ivChips = $("ivChips");
-  INTERVALS.forEach(function (iv) {
-    var b = document.createElement("button");
-    b.className = "chip"; b.type = "button"; b.id = "chip-" + iv.id;
-    b.innerHTML = iv.short + "<span class=\"semi\">" + iv.semi + "</span>";
-    b.title = iv.name;
-    b.setAttribute("aria-pressed", pool.indexOf(iv.id) >= 0 ? "true" : "false");
-    b.addEventListener("click", function () {
-      var on = b.getAttribute("aria-pressed") === "true";
-      if (on && pool.length === 1) return;
-      if (on) pool.splice(pool.indexOf(iv.id), 1); else pool.push(iv.id);
-      b.setAttribute("aria-pressed", on ? "false" : "true");
-    });
-    ivChips.appendChild(b);
-  });
   function group(containerId, key, get, set) {
     var els = $(containerId).querySelectorAll("[data-" + key + "]");
     function sync() {
@@ -691,10 +597,23 @@
     });
     sync();
   }
-  group("dirChips", "dir", function () { return dirMode; }, function (v) { dirMode = v; setRange(); });
-  group("octChips", "oct", function () { return String(octaves); }, function (v) { octaves = parseInt(v, 10); setRange(); });
   group("gradeChips", "grade", function () { return grade; }, function (v) { grade = v; });
   group("paceChips", "pace", function () { return String(pace); }, function (v) { pace = parseInt(v, 10); });
+  group("octChips", "oct", function () { return String(octaves); }, function (v) {
+    octaves = parseInt(v, 10); lastAbs = -1; setRange();
+  });
+
+  var poolEls = $("poolChips").querySelectorAll("[data-group]");
+  [].forEach.call(poolEls, function (e) {
+    e.setAttribute("aria-pressed", groups.indexOf(e.dataset.group) >= 0 ? "true" : "false");
+    e.addEventListener("click", function () {
+      var on = e.getAttribute("aria-pressed") === "true";
+      if (on && groups.length === 1) return;              // one group has to stay on
+      if (on) groups.splice(groups.indexOf(e.dataset.group), 1); else groups.push(e.dataset.group);
+      e.setAttribute("aria-pressed", on ? "false" : "true");
+      retry = null; newPrompt();
+    });
+  });
 
   function toggle(id, get, set) {
     var b = $(id);
@@ -706,10 +625,9 @@
   $("show").addEventListener("click", function () {
     if (!cur || revealed) return;
     revealed = true;
-    $("hint").textContent = "Wanted " + label(cur.root) + cur.root.oct + " + " + label(cur.target) + cur.target.oct + ".";
+    $("hint").textContent = "Wanted " + label(cur) + cur.oct + ".";
     paint();
-    tone(cur.root.abs, 0.02, 0.7);
-    tone(cur.target.abs, 0.38, 1.0);
+    tone(cur.abs, 0.02, 0.9);
   });
   $("skip").addEventListener("click", function () { retry = null; newPrompt(); });
   $("reset").addEventListener("click", function () {
@@ -745,7 +663,7 @@
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () {
       try {
-        if (document.fonts.check('40px "Noto Music"', "\uD834\uDD1E")) return;
+        if (document.fonts.check('40px "Noto Music"', "𝄞")) return;
       } catch (e) { /* fall through to labels */ }
       $("clefs").innerHTML =
         '<text class="clef-label" x="26" y="48" transform="rotate(-90 26 48)">TREBLE</text>' +
