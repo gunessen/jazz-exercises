@@ -57,6 +57,8 @@
   .pbtn.alt { --bg: var(--mist); --sh: var(--slate); }
   .pbtn.go { --bg: var(--lime); --sh: var(--green); }
   .pbtn.sm { font-size: 8px; padding: 8px 10px 10px; }
+  .pbtn.danger { --bg: var(--red); --sh: var(--plum); --fg: var(--white); }
+  .reset-note { margin: 6px 0 0 !important; font-size: 7px !important; }
   .pbtn[disabled] { --bg: var(--slate); --sh: var(--ink2); --fg: var(--mist); cursor: default; filter: none; transform: none; }
   .pbtn.tog[aria-pressed="false"] { --bg: var(--ink2); --sh: var(--night); --fg: var(--mist); }
   .chips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -237,6 +239,9 @@
               <button class="chip" data-v="on" type="button">Zaps &amp; coins</button>
               <button class="chip" data-v="off" type="button">Only the notes</button>
             </div></div>
+          <div><p class="lab">Progress</p>
+            <button class="pbtn sm danger" id="resetBtn" type="button">RESET PROGRESS</button>
+            <p class="reset-note" id="resetNote">Clears stars, coins and robes. Settings stay.</p></div>
         </div>
         <div class="row"><button class="pbtn" data-close type="button">DONE</button></div>
       </div>
@@ -1986,7 +1991,30 @@
 
   $("freeBtn").addEventListener("click", function () { sfx.click(); showOverlay("free"); });
   $("shopBtn").addEventListener("click", function () { sfx.click(); showOverlay("shop"); });
-  $("setBtn").addEventListener("click", function () { sfx.click(); showOverlay("settings"); });
+  $("setBtn").addEventListener("click", function () { sfx.click(); disarmReset(); showOverlay("settings"); });
+
+  // Two taps, so a stray click can't wipe a kid's stars.
+  var resetArmed = false;
+  function disarmReset() {
+    resetArmed = false;
+    $("resetBtn").textContent = "RESET PROGRESS";
+    $("resetNote").textContent = "Clears stars, coins and robes. Settings stay.";
+  }
+  $("resetBtn").addEventListener("click", function () {
+    if (!resetArmed) {
+      resetArmed = true;
+      $("resetBtn").textContent = "SURE? TAP AGAIN";
+      $("resetNote").textContent = "This can't be undone.";
+      sfx.click();
+      return;
+    }
+    save.stars = {}; save.wallet = 0; save.owned = ["blue"]; save.robe = "blue";
+    persist();
+    sfx.lose();
+    resetArmed = false;
+    $("resetBtn").textContent = "RESET PROGRESS";
+    $("resetNote").textContent = "Progress cleared. Back to level 1!";
+  });
   $("freeGo").addEventListener("click", function () { sfx.click(); startFree(); });
   [].forEach.call(document.querySelectorAll("[data-close]"), function (b) {
     b.addEventListener("click", function () { sfx.click(); showOverlay("menu"); });
