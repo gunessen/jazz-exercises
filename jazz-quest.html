@@ -1,0 +1,3356 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Jazz Quest</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Music&text=%E2%99%AD%E2%99%AF&display=swap">
+<style>
+  /* Jazz Quest is Note Quest's big sibling: same pixel look and the same
+     engine, so it keeps Note Quest's palette rather than the shared tokens. */
+  :root {
+    --night:#1a1c2c; --plum:#5d275d; --red:#b13e53; --orange:#ef7d57; --gold:#ffcd75;
+    --lime:#a7f070; --green:#38b764; --teal:#257179; --navy:#29366f; --blue:#3b5dc9;
+    --sky:#41a6f6; --cyan:#73eff7; --white:#f4f4f4; --mist:#94b0c2; --slate:#566c86; --ink2:#333c57;
+    --px:"Press Start 2P", "Noto Music", ui-monospace, monospace;
+    --vt:"VT323", "Noto Music", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--night); color: var(--white);
+    font-family: var(--px); font-size: 10px; line-height: 1.6;
+    padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
+  }
+  button, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  .app { max-width: 1100px; margin: 0 auto; padding: 10px 16px 16px; display: flex; flex-direction: column; gap: 10px; min-height: 100%; }
+
+  /* ---- top bar ---- */
+  .bar { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+  .back { color: var(--mist); text-decoration: none; font-size: 9px; }
+  .back:hover { color: var(--gold); }
+  .bar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 8px; color: var(--mist); }
+  .status .dot { width: 8px; height: 8px; background: var(--slate); }
+  .status[data-on="live"] .dot { background: var(--green); }
+  .status[data-on="off"] .dot { background: var(--red); }
+  .device {
+    font-size: 8px; background: var(--ink2); color: var(--white); border: 0; padding: 6px 8px; max-width: 200px;
+    box-shadow: 0 0 0 2px var(--night), 0 0 0 4px var(--slate);
+  }
+  .notice { font-size: 8px; line-height: 1.9; color: var(--gold); background: var(--ink2); padding: 10px 12px; box-shadow: 0 0 0 3px var(--slate); }
+  .notice code { color: var(--white); }
+
+  /* ---- pixel buttons ---- */
+  .pbtn {
+    --bg: var(--gold); --sh: var(--orange); --fg: var(--night);
+    background: var(--bg); color: var(--fg); border: 0; cursor: pointer;
+    padding: 10px 14px 12px; font-size: 10px; line-height: 1; white-space: nowrap;
+    box-shadow: inset -3px -4px 0 var(--sh), 0 0 0 3px var(--night);
+    margin: 3px;
+  }
+  .pbtn:hover { filter: brightness(1.08); }
+  .pbtn:active { transform: translateY(2px); box-shadow: inset -3px -2px 0 var(--sh), 0 0 0 3px var(--night); }
+  .pbtn.alt { --bg: var(--mist); --sh: var(--slate); }
+  .pbtn.go { --bg: var(--lime); --sh: var(--green); }
+  .pbtn.sky { --bg: var(--sky); --sh: var(--blue); }
+  .pbtn.sm { font-size: 8px; padding: 8px 10px 10px; }
+  .pbtn.danger { --bg: var(--red); --sh: var(--plum); --fg: var(--white); }
+  .reset-note { margin: 6px 0 0 !important; font-size: 7px !important; }
+  .pbtn[disabled] { --bg: var(--slate); --sh: var(--ink2); --fg: var(--mist); cursor: default; filter: none; transform: none; }
+  .pbtn.tog[aria-pressed="false"] { --bg: var(--ink2); --sh: var(--night); --fg: var(--mist); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    background: var(--ink2); color: var(--mist); border: 0; cursor: pointer; font-size: 8px; line-height: 1;
+    padding: 8px 10px 9px; box-shadow: inset -2px -3px 0 var(--night); margin: 2px;
+  }
+  .chip[aria-pressed="true"] { background: var(--sky); color: var(--night); box-shadow: inset -2px -3px 0 var(--blue); }
+
+  /* ---- game screen ---- */
+  /* In play the box is exactly 16:9. A menu that needs more room grows it
+     (aspect-ratio lets content win) and the canvas covers the taller box. */
+  .screen {
+    position: relative; display: grid; aspect-ratio: 16 / 9; margin: 0 auto;
+    width: min(100%, calc((100dvh - 320px) * 16 / 9)); min-width: min(100%, 320px);
+    box-shadow: 0 0 0 4px var(--night), 0 0 0 8px var(--slate); background: #111;
+  }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .overlay {
+    position: relative; grid-area: 1 / 1; z-index: 2; display: flex; align-items: center; justify-content: center;
+    padding: 14px; background: rgba(26,28,44,.72);
+  }
+  .overlay.clear { background: transparent; pointer-events: none; }
+  .overlay.clear .panel { pointer-events: auto; }
+  .panel {
+    background: var(--night); padding: 16px 18px 18px; max-width: 100%;
+    box-shadow: 0 0 0 3px var(--white), 0 0 0 6px var(--night), 6px 6px 0 6px rgba(0,0,0,.35);
+    text-align: center;
+  }
+  .panel h2 { font-size: 16px; margin: 0 0 12px; color: var(--gold); text-shadow: 3px 3px 0 var(--plum); line-height: 1.3; }
+  .panel p { margin: 0 0 10px; color: var(--mist); font-size: 8px; line-height: 1.9; }
+  .panel p.vt { font-family: var(--vt); font-size: 20px; line-height: 1.15; }
+  .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
+
+  .logo {
+    margin: 0 0 6px; font-size: clamp(22px, 5vw, 38px); line-height: 1.15; color: var(--gold);
+    text-shadow: 3px 3px 0 var(--red), 6px 6px 0 var(--plum);
+    letter-spacing: 2px;
+  }
+  .menu-panel { width: min(680px, 100%); }
+  .tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 8px 0 2px; }
+  .tab { --bg: var(--ink2); --sh: var(--night); --fg: var(--mist); font-size: 8px; padding: 9px 11px 11px; }
+  .tab[aria-selected="true"] { --bg: var(--sky); --sh: var(--blue); --fg: var(--night); }
+  .tab img { width: 9px; height: 10px; vertical-align: -1px; margin-right: 6px; }
+  .chapter-sub { margin: 10px 0 0 !important; color: var(--white) !important; }
+  .chapter-sub b { color: var(--gold); font-weight: normal; }
+  .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0 6px; }
+  .lvl {
+    position: relative; background: var(--ink2); border: 0; cursor: pointer; padding: 8px 6px 9px; color: var(--white);
+    box-shadow: inset -3px -4px 0 var(--night), 0 0 0 3px var(--slate);
+    display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 8px; line-height: 1.4;
+  }
+  .lvl:hover:not([disabled]) { box-shadow: inset -3px -4px 0 var(--night), 0 0 0 3px var(--gold); }
+  .lvl .num { position: absolute; top: 5px; left: 6px; color: var(--gold); }
+  .lvl img { width: 48px; height: 48px; image-rendering: pixelated; object-fit: contain; }
+  .lvl .stars { display: flex; gap: 2px; }
+  .lvl .stars img, .done-stars img { width: 18px; height: 18px; }
+  .lvl[disabled] { cursor: default; color: var(--slate); }
+  .lvl[disabled] img.mon { filter: brightness(0) opacity(.45); }
+  .lvl .lock { width: 21px; height: 24px; position: absolute; top: 18px; }
+  .wallet { display: inline-flex; align-items: center; gap: 6px; color: var(--gold); font-size: 10px; margin-top: 8px; }
+  .wallet img { width: 18px; height: 18px; image-rendering: pixelated; }
+  img { image-rendering: pixelated; }
+
+  .set-grid { display: grid; gap: 12px; text-align: left; margin: 4px 0 8px; }
+  .set-grid .lab { color: var(--gold); font-size: 8px; margin: 0 0 4px; }
+
+  .shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin: 10px 0; }
+  .robe { background: var(--ink2); padding: 8px 6px; box-shadow: inset -3px -4px 0 var(--night); display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 8px; }
+  .robe img { width: 64px; height: 64px; }
+  .robe.worn { box-shadow: inset -3px -4px 0 var(--night), 0 0 0 3px var(--lime); }
+
+  .done-stars { display: flex; justify-content: center; gap: 10px; margin: 4px 0 12px; }
+  .done-stars img { width: 42px; height: 42px; animation: pop .45s steps(4) both; }
+  .done-stars img:nth-child(2) { animation-delay: .35s; }
+  .done-stars img:nth-child(3) { animation-delay: .7s; }
+  @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  .facts { display: grid; grid-template-columns: auto auto; gap: 6px 18px; justify-content: center; font-size: 8px; margin: 0 0 6px; text-align: left; }
+  .facts dt { color: var(--mist); }
+  .facts dd { margin: 0; color: var(--white); text-align: right; }
+  .unlock { color: var(--lime) !important; }
+
+  /* ---- lessons & notebook ---- */
+  .lesson-panel { width: min(720px, 100%); text-align: left; }
+  .lesson-panel h2 { text-align: center; }
+  .kicker { text-align: center; color: var(--sky) !important; font-size: 8px !important; margin: 0 0 8px !important; }
+  .lesson-body p { font-family: var(--vt); font-size: 21px; line-height: 1.15; color: var(--white); margin: 0 0 9px; }
+  .lesson-body b { color: var(--gold); font-weight: normal; }
+  .lesson-body i { color: var(--cyan); font-style: normal; }
+  .lesson-body .ac, .msg .ac { font-size: .82em; line-height: 0; }
+  .lesson-body table { font-family: var(--vt); font-size: 20px; line-height: 1.1; border-collapse: collapse; margin: 2px auto 10px; }
+  .lesson-body th, .lesson-body td { padding: 3px 10px; text-align: left; border-bottom: 2px solid var(--ink2); }
+  .lesson-body th { color: var(--sky); font-weight: normal; }
+  .lesson-body td.n { text-align: right; color: var(--gold); }
+  .lesson-body .pbtn { font-size: 7px; padding: 5px 7px 7px; margin: 0; }
+  .demos { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; margin: 6px 0 0; }
+  .demo-note { text-align: center; margin: 6px 0 0 !important; font-size: 7px !important; }
+  .book { display: grid; gap: 14px; text-align: left; margin: 6px 0 4px; }
+  .book .lab { color: var(--gold); font-size: 8px; margin: 0 0 4px; }
+  .book .chips .chip { font-size: 8px; }
+  .book .chip.sheet { background: var(--teal); color: var(--white); box-shadow: inset -2px -3px 0 var(--night); }
+
+  /* ---- under the screen ---- */
+  .hud-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 40px; width: min(100%, calc((100dvh - 320px) * 16 / 9)); min-width: min(100%, 320px); margin: 4px auto 0; }
+  .msg { margin: 0; flex: 1 1 260px; font-family: var(--vt); font-size: 22px; line-height: 1.1; color: var(--white); min-height: 1.1em; }
+  .msg b { color: var(--gold); font-weight: normal; }
+  .ac { font-family: "Noto Music", serif; font-size: 1.6em; line-height: 0; vertical-align: -.1em; }
+  .msg .bad { color: var(--orange); }
+  .msg .good { color: var(--lime); }
+  .actions { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* ---- keyboard ---- */
+  .kb-wrap { background: var(--ink2); padding: 8px 8px 10px; box-shadow: 0 0 0 3px var(--night), 0 0 0 6px var(--slate); margin: 4px 3px 0; }
+  .kb { position: relative; height: 150px; width: 100%; user-select: none; -webkit-user-select: none; touch-action: none; }
+  .kb .w, .kb .b { position: absolute; top: 0; border: 0; padding: 0; cursor: pointer; }
+  .kb .w {
+    background: var(--white); height: 100%; box-shadow: inset 0 -8px 0 #cfd6dc, inset -3px 0 0 #cfd6dc, 0 0 0 1.5px var(--night);
+    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 12px;
+    font-size: 9px; color: var(--slate);
+  }
+  .kb .b { background: var(--night); height: 60%; z-index: 2; box-shadow: inset 0 -6px 0 #3d4460, inset -3px 0 0 #3d4460; }
+  .kb span { pointer-events: none; }
+  .kb .tg {
+    position: absolute; left: 50%; transform: translateX(-50%); font-size: 8px; line-height: 1; white-space: nowrap;
+    padding: 3px 3px 2px; background: var(--night); color: var(--gold); z-index: 3;
+  }
+  .kb .tg:empty { display: none; }
+  .kb .w .tg { bottom: 32px; }
+  .kb .b .tg { bottom: 8px; background: var(--gold); color: var(--night); }
+  .kb .w.held, .kb .b.held { background: var(--gold); color: var(--night); }
+  .kb .w.root, .kb .b.root { background: var(--sky); color: var(--night); }
+  .kb .w.demo, .kb .b.demo { background: var(--cyan); color: var(--night); }
+  .kb .w.got, .kb .b.got, .kb .w.right, .kb .b.right { background: var(--lime); color: var(--night); }
+  .kb .w.wrong, .kb .b.wrong { background: var(--red); color: var(--white); }
+  .kb .w.ghost { animation: ghostW .5s steps(2) infinite; }
+  .kb .b.ghost { animation: ghostB .5s steps(2) infinite; }
+  @keyframes ghostW { 0% { background: var(--white); } 100% { background: var(--lime); } }
+  @keyframes ghostB { 0% { background: var(--night); } 100% { background: var(--green); } }
+  .kb-legend { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 7px; color: var(--mist); }
+
+  @media (max-width: 640px) {
+    .app { padding: 8px 12px 14px; }
+    .kb { height: 120px; }
+    .kb .w .tg { bottom: 26px; }
+    .panel { padding: 12px 10px 14px; }
+    .levels { gap: 8px; }
+    .lvl img { width: 36px; height: 36px; }
+    .lvl .lock { top: 14px; }
+    .lesson-body p { font-size: 19px; }
+    .lesson-body table { font-size: 17px; }
+    .lesson-body th, .lesson-body td { padding: 2px 5px; }
+    .msg { font-size: 20px; }
+  }
+  @media (max-height: 560px) and (orientation: landscape) {
+    .kb { height: 96px; }
+    .kb .w .tg { bottom: 22px; }
+    .screen, .hud-row { width: min(100%, calc((100dvh - 190px) * 16 / 9)); }
+  }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <a class="back" href="index.html">&#9664; Jazz Exercises</a>
+    <div class="bar-right">
+      <span class="status" id="status" data-on="wait"><span class="dot"></span><span id="statusText">connecting</span></span>
+      <select class="device" id="device" aria-label="MIDI input"><option>No MIDI input</option></select>
+      <button class="pbtn sm alt tog" id="soundBtn" type="button" aria-pressed="true">SOUND</button>
+      <button class="pbtn sm alt" id="fs" type="button" hidden>FULL</button>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <div class="screen" id="screen">
+    <canvas id="game" width="320" height="180" aria-label="Jazz Quest game"></canvas>
+
+    <div class="overlay" id="menu">
+      <div class="panel menu-panel">
+        <h1 class="logo">JAZZ QUEST</h1>
+        <p class="vt">Monsters stole the chords from the Blue Note Club! Learn intervals, build 7th chords and get the band swinging ii&ndash;V&ndash;I again.</p>
+        <div class="tabs" id="tabs" role="tablist" aria-label="Chapters"></div>
+        <p class="vt chapter-sub" id="chapterSub"></p>
+        <div class="levels" id="levels"></div>
+        <div class="row">
+          <button class="pbtn go" id="freeBtn" type="button">PRACTICE</button>
+          <button class="pbtn sky" id="bookBtn" type="button">NOTEBOOK</button>
+          <button class="pbtn alt" id="shopBtn" type="button">WARDROBE</button>
+          <button class="pbtn alt" id="setBtn" type="button">SETTINGS</button>
+        </div>
+        <span class="wallet"><img id="walletIcon" alt=""><span id="wallet">0</span></span>
+      </div>
+    </div>
+
+    <div class="overlay" id="settings" hidden>
+      <div class="panel" style="width:min(540px,100%)">
+        <h2>SETTINGS</h2>
+        <div class="set-grid">
+          <div><p class="lab">Monsters walk</p>
+            <div class="chips" id="speedChips">
+              <button class="chip" data-v="relaxed" type="button">Don't walk</button>
+              <button class="chip" data-v="normal" type="button">Slowly</button>
+              <button class="chip" data-v="fast" type="button">Fast</button>
+            </div></div>
+          <div><p class="lab">After a miss, wait</p>
+            <div class="chips" id="paceChips">
+              <button class="chip" data-v="3000" type="button">3s</button>
+              <button class="chip" data-v="5000" type="button">5s</button>
+              <button class="chip" data-v="0" type="button">Until I press Next</button>
+            </div></div>
+          <div><p class="lab">Letters on the keys</p>
+            <div class="chips" id="labelChips">
+              <button class="chip" data-v="c" type="button">Only C</button>
+              <button class="chip" data-v="all" type="button">All white keys</button>
+              <button class="chip" data-v="none" type="button">None</button>
+            </div></div>
+          <div><p class="lab">Game sounds</p>
+            <div class="chips" id="sfxChips">
+              <button class="chip" data-v="on" type="button">Zaps &amp; coins</button>
+              <button class="chip" data-v="off" type="button">Only the notes</button>
+            </div></div>
+          <div><p class="lab">Band plays each finished progression</p>
+            <div class="chips" id="bandChips">
+              <button class="chip" data-v="on" type="button">Yes</button>
+              <button class="chip" data-v="off" type="button">No</button>
+            </div></div>
+          <div><p class="lab">Levels</p>
+            <div class="chips" id="unlockChips">
+              <button class="chip" data-v="off" type="button">Unlock one by one</button>
+              <button class="chip" data-v="on" type="button">Unlock everything</button>
+            </div></div>
+          <div><p class="lab">Progress</p>
+            <button class="pbtn sm danger" id="resetBtn" type="button">RESET PROGRESS</button>
+            <p class="reset-note" id="resetNote">Clears stars, coins and robes. Settings stay.</p></div>
+        </div>
+        <div class="row"><button class="pbtn" data-close type="button">DONE</button></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="free" hidden>
+      <div class="panel" style="width:min(560px,100%)">
+        <h2>PRACTICE</h2>
+        <p>Pick what to drill. No hearts to lose &mdash; play as long as you like.</p>
+        <div class="set-grid">
+          <div><p class="lab">Drill</p>
+            <div class="chips" id="modeChips">
+              <button class="chip" data-v="int" type="button">Intervals</button>
+              <button class="chip" data-v="chord" type="button">7th chords</button>
+              <button class="chip" data-v="prog" type="button">Progressions</button>
+            </div></div>
+          <div data-for="int"><p class="lab">Intervals</p>
+            <div class="chips" id="ivChips"></div></div>
+          <div data-for="chord"><p class="lab">Chords</p>
+            <div class="chips" id="qualChips">
+              <button class="chip" data-m="maj7" type="button">maj7</button>
+              <button class="chip" data-m="dom7" type="button">7</button>
+              <button class="chip" data-m="m7" type="button">m7</button>
+            </div></div>
+          <div data-for="prog"><p class="lab">Progression</p>
+            <div class="chips" id="pidChips">
+              <button class="chip" data-v="iiVI" type="button">ii&ndash;V&ndash;I</button>
+              <button class="chip" data-v="turn" type="button">I&ndash;vi&ndash;ii&ndash;V</button>
+            </div></div>
+          <div><p class="lab">Roots &amp; keys</p>
+            <div class="chips" id="keyChips">
+              <button class="chip" data-v="easy" type="button">A few easy ones</button>
+              <button class="chip" data-v="all" type="button">All 12</button>
+            </div></div>
+          <div data-for="chord prog"><p class="lab">Notes to play</p>
+            <div class="chips" id="voiceChips">
+              <button class="chip" data-v="full" type="button">Whole chord</button>
+              <button class="chip" data-v="shell" type="button">Shell: R 3 7</button>
+              <button class="chip" data-v="guide" type="button">Guide tones: 3 7</button>
+            </div></div>
+          <div data-for="prog"><p class="lab">Chord names on the sign</p>
+            <div class="chips" id="namesChips">
+              <button class="chip" data-v="show" type="button">Show</button>
+              <button class="chip" data-v="hide" type="button">Hide &mdash; work them out</button>
+            </div></div>
+        </div>
+        <div class="row">
+          <button class="pbtn go" id="freeGo" type="button">START &#9654;</button>
+          <button class="pbtn alt" data-close type="button">BACK</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="shop" hidden>
+      <div class="panel" style="width:min(600px,100%)">
+        <h2>WARDROBE</h2>
+        <p>Spend your coins on a new robe. Your spells change colour too!</p>
+        <div class="shop" id="robes"></div>
+        <span class="wallet"><img id="walletIcon2" alt=""><span id="wallet2">0</span></span>
+        <div class="row"><button class="pbtn" data-close type="button">DONE</button></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="book" hidden>
+      <div class="panel" style="width:min(600px,100%)">
+        <h2>NOTEBOOK</h2>
+        <p>Every lesson you've reached, plus cheat sheets. Each one has buttons that play the examples.</p>
+        <div class="book" id="bookList"></div>
+        <div class="row"><button class="pbtn" data-close type="button">DONE</button></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="lesson" hidden>
+      <div class="panel lesson-panel">
+        <p class="kicker" id="lessonKicker"></p>
+        <h2 id="lessonTitle"></h2>
+        <div class="lesson-body" id="lessonBody"></div>
+        <div class="demos" id="lessonDemos"></div>
+        <p class="demo-note" id="demoNote">Tap a button to hear it and see it on the keyboard below.</p>
+        <div class="row">
+          <button class="pbtn go" id="lessonGo" type="button">PLAY &#9654;</button>
+          <button class="pbtn alt" id="lessonBack" type="button">MAP</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay clear" id="done" hidden>
+      <div class="panel" style="width:min(440px,100%)">
+        <h2 id="doneTitle">LEVEL CLEAR!</h2>
+        <div class="done-stars" id="doneStars"></div>
+        <dl class="facts" id="doneFacts"></dl>
+        <p class="unlock" id="doneUnlock" hidden></p>
+        <div class="row">
+          <button class="pbtn go" id="nextLvl" type="button">NEXT &#9654;</button>
+          <button class="pbtn alt" id="replay" type="button">AGAIN</button>
+          <button class="pbtn alt" data-map type="button">MAP</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay clear" id="over" hidden>
+      <div class="panel" style="width:min(440px,100%)">
+        <h2>OH NO!</h2>
+        <p id="overText">Out of hearts. Shake it off and try again!</p>
+        <dl class="facts" id="overFacts"></dl>
+        <div class="row">
+          <button class="pbtn go" id="retryLvl" type="button">TRY AGAIN</button>
+          <button class="pbtn sky" id="overLesson" type="button">LESSON</button>
+          <button class="pbtn alt" data-map type="button">MAP</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud-row" id="hudRow">
+    <p class="msg" id="msg" aria-live="polite">Pick a level to start your quest!</p>
+    <div class="actions" id="actions" hidden>
+      <button class="pbtn sm go" id="nextBtn" type="button" hidden>NEXT &#9654;</button>
+      <button class="pbtn sm alt" id="hintBtn" type="button">HINT</button>
+      <button class="pbtn sm sky" id="lessonBtn" type="button">LESSON</button>
+      <button class="pbtn sm alt" id="skipBtn" type="button" hidden>SKIP</button>
+      <button class="pbtn sm alt" id="mapBtn" type="button">MAP</button>
+    </div>
+  </div>
+
+  <div class="kb-wrap">
+    <div class="kb" id="kb"></div>
+    <div class="kb-legend">
+      <span id="kbRange">C4 &mdash; B5 &middot; tap or play</span>
+      <span id="kbHow">any octave counts</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  function now() { return performance.now(); }
+  function rand(n) { return Math.floor(Math.random() * n); }
+  function pick(a) { return a[rand(a.length)]; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function pcOf(m) { return ((m % 12) + 12) % 12; }
+
+  /* ---------- music theory ---------- */
+  var LET = ["C","D","E","F","G","A","B"];
+  var LETSEMI = [0,2,4,5,7,9,11];
+  function acc(n) { return n === 0 ? "" : n > 0 ? "♯".repeat(n) : "♭".repeat(-n); }
+  var SHARP = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+  var FLAT  = ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
+  function midiName(m, flat, withOct) {
+    return (flat ? FLAT : SHARP)[pcOf(m)] + (withOct ? (Math.floor(m / 12) - 1) : "");
+  }
+  var SPELL_SHARP = [[0,0],[0,1],[1,0],[1,1],[2,0],[3,0],[3,1],[4,0],[4,1],[5,0],[5,1],[6,0]];
+  var SPELL_FLAT  = [[0,0],[1,-1],[1,0],[2,-1],[2,0],[3,0],[4,-1],[4,0],[5,-1],[5,0],[6,-1],[6,0]];
+
+  // A spelled note is {l: letter 0-6, a: accidental}. note("B♭") -> {l:6, a:-1}
+  function note(name) {
+    var a = 0;
+    for (var i = 1; i < name.length; i++) a += name[i] === "♯" ? 1 : name[i] === "♭" ? -1 : 0;
+    return { l: LET.indexOf(name[0]), a: a };
+  }
+  function pcN(n) { return pcOf(LETSEMI[n.l] + n.a); }
+  function nameN(n) { return LET[n.l] + acc(n.a); }
+  function plain(pc, flat) { var s = (flat ? SPELL_FLAT : SPELL_SHARP)[pcOf(pc)]; return { l: s[0], a: s[1] }; }
+  // Proper letter spelling, except where a beginner would meet E♯, B♯, C♭,
+  // F♭ or a double accidental: those become the everyday name of the key.
+  function tidy(n) {
+    var odd = Math.abs(n.a) > 1 || (n.a === 1 && (n.l === 2 || n.l === 6)) || (n.a === -1 && (n.l === 0 || n.l === 3));
+    return odd ? plain(pcN(n), n.a < 0) : n;
+  }
+
+  var INTERVALS = [
+    {id:"P1", steps:0, semi:0,  name:"unison"},
+    {id:"m2", steps:1, semi:1,  name:"minor 2nd"},
+    {id:"M2", steps:1, semi:2,  name:"major 2nd"},
+    {id:"m3", steps:2, semi:3,  name:"minor 3rd"},
+    {id:"M3", steps:2, semi:4,  name:"major 3rd"},
+    {id:"P4", steps:3, semi:5,  name:"perfect 4th"},
+    {id:"TT", steps:3, semi:6,  name:"tritone"},
+    {id:"P5", steps:4, semi:7,  name:"perfect 5th"},
+    {id:"m6", steps:5, semi:8,  name:"minor 6th"},
+    {id:"M6", steps:5, semi:9,  name:"major 6th"},
+    {id:"m7", steps:6, semi:10, name:"minor 7th"},
+    {id:"M7", steps:6, semi:11, name:"major 7th"},
+    {id:"P8", steps:7, semi:12, name:"octave"}
+  ];
+  var IV = {};
+  INTERVALS.forEach(function (v) { IV[v.id] = v; });
+  function up(n, id) {
+    var iv = IV[id], l = (n.l + iv.steps) % 7;
+    var a = pcOf(pcN(n) + iv.semi - LETSEMI[l]);
+    if (a > 6) a -= 12;
+    return tidy({ l: l, a: a });
+  }
+
+  var QUAL = {
+    maj:  { sym:"",     name:"major triad", ivs:["P1","M3","P5"],      stack:"M3 + m3" },
+    min:  { sym:"m",    name:"minor triad", ivs:["P1","m3","P5"],      stack:"m3 + M3" },
+    maj7: { sym:"maj7", name:"major 7",     ivs:["P1","M3","P5","M7"], stack:"M3 + m3 + M3" },
+    dom7: { sym:"7",    name:"dominant 7",  ivs:["P1","M3","P5","m7"], stack:"M3 + m3 + m3" },
+    m7:   { sym:"m7",   name:"minor 7",     ivs:["P1","m3","P5","m7"], stack:"m3 + M3 + m3" }
+  };
+  var DEG = ["R","3","5","7"];
+  var NATURALS = ["C","D","E","F","G","A","B"];
+  var KEYS12 = ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
+  // Roots spelled the way charts spell them, so no chord needs E♯ or C♭.
+  var ROOTS = {
+    maj:  NATURALS, min: NATURALS,
+    maj7: ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"],
+    dom7: ["C","D♭","D","E♭","E","F","F♯","G","A♭","A","B♭","B"],
+    m7:   ["C","C♯","D","E♭","E","F","F♯","G","G♯","A","B♭","B"]
+  };
+  var EASY_ROOTS = ["C","F","G","D","B♭","E♭"];
+  // Which chord tones a voicing asks for, and which it lets you add.
+  var VOICE = {
+    full:  { need:["R","3","5","7"], ok:[],        name:"whole chord" },
+    shell: { need:["R","3","7"],     ok:["5"],     name:"shell" },
+    guide: { need:["3","7"],         ok:["R","5"], name:"guide tones" }
+  };
+  function chordOf(rootName, q) {
+    var r = note(rootName);
+    var tones = QUAL[q].ivs.map(function (id, i) {
+      var n = up(r, id);
+      return { pc: pcN(n), name: nameN(n), deg: DEG[i] };
+    });
+    return { rootName: nameN(r), rootPc: pcN(r), q: q, sym: nameN(r) + QUAL[q].sym, tones: tones };
+  }
+  function toneNames(c, degs) {
+    return c.tones.filter(function (t) { return !degs || degs.indexOf(t.deg) >= 0; })
+      .map(function (t) { return t.name; }).join(" ");
+  }
+  // Close position from the root in the 4th octave: what the glowing keys show.
+  function closeVoicing(c, degs) {
+    var out = [], prev = -1;
+    c.tones.forEach(function (t) {
+      var m = 60 + t.pc;
+      while (m <= prev) m += 12;
+      prev = m;
+      if (!degs || degs.indexOf(t.deg) >= 0) out.push(m);
+    });
+    return out;
+  }
+
+  var PROGS = {
+    iiVI: { name:"ii-V-I", html:"ii&ndash;V&ndash;I",
+      steps:[{num:"ii",iv:"M2",q:"m7"},{num:"V",iv:"P5",q:"dom7"},{num:"I",iv:"P1",q:"maj7"}] },
+    turn: { name:"I-vi-ii-V", html:"I&ndash;vi&ndash;ii&ndash;V",
+      steps:[{num:"I",iv:"P1",q:"maj7"},{num:"vi",iv:"M6",q:"m7"},{num:"ii",iv:"M2",q:"m7"},{num:"V",iv:"P5",q:"dom7"}] }
+  };
+  function progOf(keyName, pid) {
+    var k = note(keyName);
+    return PROGS[pid].steps.map(function (s) {
+      var c = chordOf(nameN(up(k, s.iv)), s.q);
+      c.num = s.num;
+      return c;
+    });
+  }
+
+  /* ---------- saved progress ---------- */
+  var SAVE_KEY = "jazzQuest.v1";
+  var FREE_DEFAULT = { mode:"int", ivs:["m3","M3","P5"], quals:["maj7","dom7","m7"], pid:"iiVI", keys:"easy", voicing:"full", names:"show" };
+  var save = {
+    stars: {}, wallet: 0, owned: ["blue"], robe: "blue", seen: {}, chapter: 0,
+    speed: "normal", pace: 3000, labels: "c", sfx: true, sound: true, band: true, unlockAll: false,
+    free: {}
+  };
+  try {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (raw) { var o = JSON.parse(raw); for (var k in o) if (o[k] !== undefined) save[k] = o[k]; }
+  } catch (e) { /* private window or blocked storage: play without saving */ }
+  if (!save.free || typeof save.free !== "object") save.free = {};
+  for (var fk in FREE_DEFAULT) if (save.free[fk] === undefined) save.free[fk] = FREE_DEFAULT[fk];
+  function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+  /* ---------- sprites (Note Quest's set, plus jazz folk and club props) ---------- */
+  var SPR = {
+    hero: [
+      "......kkk.......",
+      ".....khppk......",
+      "....khpppk......",
+      "....kppyppk..kk.",
+      "...kppppppk.kggk",
+      "..kkkkkkkkkkkgwk",
+      "....kssssk...kk.",
+      "....ksskskk..o..",
+      "....kssssk..so..",
+      "...kkpppkkkkso..",
+      "..kpppppppppk...",
+      "..kqpppyppqk.o..",
+      "..kqppppppqk.o..",
+      ".kqqpppppppqko..",
+      ".kqqqqqqqqqqqo..",
+      "..kkkkkkkkkkkok."
+    ],
+    heroCast: [
+      "......kkk.......",
+      ".....khppk.....w",
+      "....khpppk...kk.",
+      "....kppyppk.kggk",
+      "...kppppppk.kgwk",
+      "..kkkkkkkkkkkkk.",
+      "....kssssk..ok..",
+      "....ksskskk.o...",
+      "....ksssskkso...",
+      "...kkpppkssko...",
+      "..kpppppppkk....",
+      "..kqpppyppqko...",
+      "..kqppppppqko...",
+      ".kqqppppppqko...",
+      ".kqqqqqqqqqqo...",
+      "..kkkkkkkkkkok.."
+    ],
+    slime: [
+      "................",
+      "................",
+      "................",
+      "................",
+      "......kkkk......",
+      "....kkaaaakk....",
+      "...kaccaaaaak...",
+      "..kaccaaaaaaak..",
+      "..kacaaaaaaaak..",
+      ".kawwaawwaaaaak.",
+      ".kkwakkwaaaaaak.",
+      ".kaaaaaaaaaaaak.",
+      ".kaaakkkaaaaabk.",
+      ".kbaaaaaaaaabbk.",
+      "..kbbbbbbbbbbk..",
+      "...kkkkkkkkkk..."
+    ],
+    shroom: [
+      "................",
+      ".....kkkkkk.....",
+      "...kkaaaawwkk...",
+      "..kawwaaaawwak..",
+      ".kaawwaaaaaaaak.",
+      ".kaaaaaawwaaaak.",
+      ".kbaaaaawwaaabk.",
+      "..kbbbbbbbbbbk..",
+      "...kkkkkkkkkk...",
+      "....kwwwwwwk....",
+      "....kwewwewk....",
+      "....kwewwewk....",
+      "....kwwkkwwk....",
+      "....kxwwwwxk....",
+      "...kkokkkkokk...",
+      "...kook..kook..."
+    ],
+    batA: [
+      "................",
+      "................",
+      "................",
+      "k..............k",
+      "kk....k..k....kk",
+      "kak...kkkk...kak",
+      "kaak.kaaaak.kaak",
+      "kaaakaaaaaakaaak",
+      ".kaakawaawakaak.",
+      ".kbaakaaaakaabk.",
+      "..kbkkaaaakkbk..",
+      "...k.kwkkwk.k...",
+      "......k..k......",
+      "................",
+      "................",
+      "................"
+    ],
+    batB: [
+      "................",
+      "................",
+      "................",
+      "................",
+      "......k..k......",
+      "......kkkk......",
+      ".....kaaaak.....",
+      "..kkkaaaaaakkk..",
+      ".kaakawaawakaak.",
+      "kaaaakaaaakaaaak",
+      "kaaakkaaaakkaaak",
+      "kaak.kwkkwk.kaak",
+      "kak...k..k...kak",
+      "kk............kk",
+      "k..............k",
+      "................"
+    ],
+    ghost: [
+      "................",
+      ".....kkkkkk.....",
+      "....kccaaaak....",
+      "...kcaaaaaaak...",
+      "..kcaaaaaaaaak..",
+      "..kakkaakkaaak..",
+      "..kakkaakkaaak..",
+      "..kaaaaaaaaaak..",
+      "..kaaakkaaaaak..",
+      "..kaaakkaaaaak..",
+      "..kaaaaaaaaaak..",
+      "..kbaaaaaaaabk..",
+      "..kbbaaaaaabbk..",
+      "..kbkbbkbbkbbk..",
+      "..kk.kk.kk.kk...",
+      "................"
+    ],
+    goblin: [
+      "................",
+      "................",
+      ".....kkkkk......",
+      "kk..kaaaaak..kk.",
+      "kak.kaaaaaak.kak",
+      ".kakawwaawwakak.",
+      "..kaakwakwaaak..",
+      "...kaaaaaaaak...",
+      "...kaakkkkaak...",
+      "...kkawwwwakk...",
+      "k..kmkkkkkkmk...",
+      "ok.kmmmmmmmmk...",
+      "okkammmrmmmak...",
+      ".okkmmmmmmmk....",
+      "..kkmmkkmmk.....",
+      "...kkk..kkk....."
+    ],
+    dragon: [
+      "........................",
+      ".....kk.................",
+      "....kaak.......kk.......",
+      "...kaaaakk....kaak......",
+      "..kaaaaaaakk.kaaak......",
+      "..kaaaaakkaakaaaak..kk..",
+      ".kawkaaakbbkkaaaakkaak..",
+      "kaakkaaakbbbkkkkkaaaak..",
+      "kaaaaaaakbbbbbkaaaaak...",
+      "kkwkwaaaakbbbbkaaaakkk..",
+      ".kkkkaaaaakkbbkaaakaak..",
+      "...kaaaaaaaakkaaaakaak..",
+      "...kacccaaaaaaaaakaaak..",
+      "..kacccccaaaaaaaaaaak...",
+      "..kaccccccaaaaaaaaaak...",
+      "..kaccccccaaaaaaaabk....",
+      "...kacccccaaaaaaabbk....",
+      "....kaccccaaaaabbkkk....",
+      ".....kkaaaaaabbk..kak...",
+      "......kaakkkaak...kaak..",
+      ".....kaak..kaak....kaak.",
+      ".....kkkk..kkkk.....kkk."
+    ],
+    crown: [
+      "k..k..k.",
+      "kykkykyk",
+      "kyyyyyyk",
+      "kyryyryk",
+      "kkkkkkkk"
+    ],
+    heart: [
+      ".kk.kk.",
+      "krrkrrk",
+      "krwrrrk",
+      "krrrrrk",
+      ".krrrk.",
+      "..krk..",
+      "...k..."
+    ],
+    heartEmpty: [
+      ".kk.kk.",
+      "kzzkzzk",
+      "kzzzzzk",
+      "kzzzzzk",
+      ".kzzzk.",
+      "..kzk..",
+      "...k..."
+    ],
+    coin: [
+      ".kkkk.",
+      "kyyywk",
+      "kyykyk",
+      "kyykyk",
+      "kyyyyk",
+      ".kkkk."
+    ],
+    star: [
+      "....k....",
+      "...kyk...",
+      "...kyk...",
+      "kkkkyykkk",
+      "kyyyyyyyk",
+      ".kyyyyyk.",
+      ".kyykyyk.",
+      "kyk...kyk",
+      "kk.....kk"
+    ],
+    sharp: [
+      ".#.#.",
+      ".#.#.",
+      "#####",
+      ".#.#.",
+      "#####",
+      ".#.#.",
+      ".#.#."
+    ],
+    flat: [
+      "#...",
+      "#...",
+      "#...",
+      "###.",
+      "#..#",
+      "#.#.",
+      "##.."
+    ],
+    treble: [
+      "....##..",
+      "...#..#.",
+      "...#..#.",
+      "...#.#..",
+      "...##...",
+      "...#....",
+      "..##....",
+      ".#.#....",
+      "#..###..",
+      "#.#.#.#.",
+      "#.#.#..#",
+      "#..##..#",
+      ".#..#.#.",
+      "..###...",
+      "....#...",
+      "....#...",
+      ".##.#...",
+      ".##.#...",
+      "..##...."
+    ],
+    bass: [
+      "..###....",
+      ".#...#..#",
+      "##....#..",
+      "##....#..",
+      "......#..",
+      ".....#..#",
+      "....#....",
+      "...#.....",
+      ".##......",
+      "#........"
+    ],
+    tree: [
+      "......kkkk......",
+      "....kkaaaakk....",
+      "...kaacaaaaak...",
+      "..kaccaaaaaaak..",
+      "..kacaaaaaaabk..",
+      ".kaaaaaaaaaaabk.",
+      ".kaaaaaaaaaabbk.",
+      ".kbaaaaaaaabbbk.",
+      "..kbbaaaabbbbk..",
+      "...kkbbbbbbkk...",
+      ".....kkookk.....",
+      "......koak......",
+      "......kook......",
+      "......kook......",
+      ".....kooook.....",
+      "....kkkkkkkk...."
+    ],
+    pine: [
+      "......kk......",
+      ".....kwak.....",
+      "....kwaaak....",
+      "...kaaaabk....",
+      "....kkaakk....",
+      "...kwaaaabk...",
+      "..kwaaaaabbk..",
+      "...kkaaabkk...",
+      "..kwaaaaaabk..",
+      ".kwaaaaaaabbk.",
+      "kaaaaaaaaabbbk",
+      ".kkkkkookkkkk.",
+      "......oo......",
+      ".....kook....."
+    ],
+    deadtree: [
+      "..k.......k...",
+      "..ak....kak...",
+      "...ak..kak..k.",
+      "k...akkak..ka.",
+      "ak...aaa..kak.",
+      ".akk.aak.kak..",
+      "..aakaaakak...",
+      "....kaaaak....",
+      ".....aaak.....",
+      ".....aaak.....",
+      ".....aabk.....",
+      ".....aabk.....",
+      "....kaabbk....",
+      "...kaaabbbk..."
+    ],
+    crystal: [
+      "....k.....",
+      "...kck....",
+      "...kcak.k.",
+      "..kcaakkck",
+      "..kcaabkca",
+      "..kcaabkca",
+      ".k.kaabkab",
+      "kckkaabkab",
+      "kcakaabkab",
+      "kcabkabkkk",
+      "kkkkkkkk.."
+    ],
+    torch: [
+      "..y...",
+      ".yym..",
+      ".ymmy.",
+      "..mr..",
+      ".kkkk.",
+      ".kook.",
+      "..ok..",
+      "..ok..",
+      "..ok..",
+      "..kk.."
+    ],
+    flower: [
+      ".y.",
+      "yry",
+      ".y.",
+      ".a.",
+      "aa.",
+      ".a."
+    ],
+    cloud: [
+      "........wwww..........",
+      "......wwwwwwww........",
+      "..wwwwwwwwwwwwww.www..",
+      ".wwwwwwwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwwwwwwwww",
+      ".xxxxxxxxxxxxxxxxxxxx."
+    ],
+    rock: [
+      "....kkkk....",
+      "..kkxxxzkk..",
+      ".kxxxxxzzzk.",
+      "kxxxxxzzzzzk",
+      "kkkkkkkkkkkk"
+    ],
+    lock: [
+      "..kkk..",
+      ".k...k.",
+      ".k...k.",
+      "kkkkkkk",
+      "kyyyyyk",
+      "kyykyyk",
+      "kyykyyk",
+      "kkkkkkk"
+    ]
+    ,
+    note: [
+      "........kk......",
+      "........kakk....",
+      "........kabbk...",
+      "........ka.kbk..",
+      "........ka..kbk.",
+      "........ka...kk.",
+      "........ka......",
+      "........ka......",
+      "....kkkkka......",
+      "..kkaaaaaak.....",
+      ".kaccaaaaaak....",
+      ".kawkaawkaak....",
+      ".kaaaaaaaaak....",
+      "..kbaarraabk....",
+      "...kkkkkkkk.....",
+      "...kk....kk....."
+    ],
+    cat: [
+      "................",
+      "..k.........k...",
+      ".kak.......kak..",
+      ".kaak.....kaak..",
+      ".kaaakkkkkaaak..",
+      ".kaaaaaaaaaaak..",
+      "kakkkkkkkkkkkak.",
+      "kaakgkkakgkkaak.",
+      "kaaakkaaakkaaak.",
+      ".kaaaaaraaaaak..",
+      ".kaaaakkkaaaak..",
+      "..kkaaaaaaakk...",
+      "..kbaaaaaaabk...",
+      ".kbaaaaaaaaabk.k",
+      ".kbaaakaaaaabkak",
+      "..kkkk.kkkkkkkk."
+    ],
+    lamp: [
+      "..kkk..",
+      ".kxxxk.",
+      "kyyyyyk",
+      "kyyyyyk",
+      ".kkkkk.",
+      "...k...",
+      "...z...", "...z...", "...z...", "...z...", "...z...", "...z...", "...z...",
+      "...z...", "...z...", "...z...", "...z...", "...z...", "...z...", "...z...",
+      "..kzk..",
+      ".kzzzk.",
+      "kzzzzzk"
+    ],
+    bench: [
+      "kkkkkkkkkkkkkkkk",
+      "kooooooooooooook",
+      "kkkkkkkkkkkkkkkk",
+      "kooooooooooooook",
+      "kkkkkkkkkkkkkkkk",
+      ".kk..........kk.",
+      ".kk..........kk."
+    ],
+    piano: [
+      "kkkkkkkkkkkkkkkkkkkk",
+      "kbbbbbbbbbbbbbbbbbbk",
+      "kaaaaaaaaaaaaaaaaaak",
+      "kaakkkkkkkkkkkkkkaak",
+      "kaakaaaawwwwaaaakaak",
+      "kaakaaaawkwwaaaakaak",
+      "kaakaaaawwkwaaaakaak",
+      "kaakkkkkkkkkkkkkkaak",
+      "kaaaaaaaaaaaaaaaaaak",
+      "kkkkkkkkkkkkkkkkkkkk",
+      "kwkwkwwkwkwkwwkwkwwk",
+      "kwwwwwwwwwwwwwwwwwwk",
+      "kkkkkkkkkkkkkkkkkkkk",
+      "kaaaaaaaaaaaaaaaaaak",
+      "kaabbbbbbbbbbbbbbaak",
+      "kaaaaaaaaaaaaaaaaaak",
+      "kkkkkkkkkkkkkkkkkkkk",
+      ".kk..............kk."
+    ],
+    mic: [
+      ".kkk.",
+      "kxzxk",
+      "kzxzk",
+      "kxzxk",
+      ".kkk.",
+      "..k..",
+      "..z..", "..z..", "..z..", "..z..", "..z..", "..z..", "..z..",
+      "..z..", "..z..", "..z..", "..z..", "..z..", "..z..", "..z..",
+      "..z..",
+      ".kzk.",
+      "kzzzk"
+    ],
+    table: [
+      ".....y......",
+      "....ymy.....",
+      ".....w......",
+      ".....w......",
+      "kkkkkkkkkkkk",
+      "krrrrrrrrrrk",
+      ".krrrrrrrrk.",
+      "....kook....",
+      "....kook....",
+      "....kook....",
+      "..kkkkkkkk.."
+    ],
+    neonNote: [
+      "..#####",
+      "..#...#",
+      "..#...#",
+      "###.###",
+      "###.###"
+    ],
+    jazz: [
+      "..#..#..###.###",
+      "..#.#.#...#...#",
+      "..#.###..#...#.",
+      "#.#.#.#.#...#..",
+      ".#..#.#.###.###"
+    ]
+  };
+  var BASE = {
+    k:"#1a1c2c", "#":"#1a1c2c", e:"#1a1c2c", w:"#f4f4f4", s:"#f2c09c", o:"#8f563b", y:"#ffcd75",
+    r:"#b13e53", m:"#ef7d57", x:"#94b0c2", z:"#566c86", g:"#73eff7",
+    a:"#38b764", b:"#257179", c:"#a7f070", p:"#3b5dc9", q:"#29366f", h:"#41a6f6"
+  };
+  var sprCache = {};
+  // pal may be a map of overrides or "flash" for an all-white silhouette.
+  function sprite(name, pal, key) {
+    var id = name + "|" + (key || (pal === "flash" ? "flash" : ""));
+    if (sprCache[id]) return sprCache[id];
+    var rows = SPR[name], h = rows.length, w = rows[0].length;
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var x = c.getContext("2d"), i, j, ch;
+    for (j = 0; j < h; j++) for (i = 0; i < w; i++) {
+      ch = rows[j][i];
+      if (ch === ".") continue;
+      x.fillStyle = pal === "flash" ? "#ffffff" : ((pal && pal[ch]) || BASE[ch]);
+      x.fillRect(i, j, 1, 1);
+    }
+    sprCache[id] = c;
+    return c;
+  }
+  function spriteURL(name, pal, key, scale) {
+    var s = sprite(name, pal, key), c = document.createElement("canvas");
+    c.width = s.width * scale; c.height = s.height * scale;
+    var x = c.getContext("2d"); x.imageSmoothingEnabled = false;
+    x.drawImage(s, 0, 0, c.width, c.height);
+    return c.toDataURL();
+  }
+
+  var ROBES = [
+    { id:"blue",   name:"Sky",      cost:0,    pal:{ p:"#3b5dc9", q:"#29366f", h:"#41a6f6", g:"#73eff7" }, bolt:["#73eff7","#f4f4f4"] },
+    { id:"red",    name:"Fire",     cost:200,  pal:{ p:"#b13e53", q:"#5d275d", h:"#ef7d57", g:"#ffcd75" }, bolt:["#ef7d57","#ffcd75"] },
+    { id:"green",  name:"Forest",   cost:400,  pal:{ p:"#38b764", q:"#257179", h:"#a7f070", g:"#a7f070" }, bolt:["#a7f070","#f4f4f4"] },
+    { id:"shadow", name:"Shadow",   cost:700,  pal:{ p:"#5d275d", q:"#3a1f3d", h:"#b55088", g:"#f4a6ff" }, bolt:["#f4a6ff","#b55088"] },
+    { id:"zoot",   name:"Zoot",     cost:1000, pal:{ p:"#ef7d57", q:"#b13e53", h:"#ffcd75", g:"#a7f070" }, bolt:["#a7f070","#ffcd75"] },
+    { id:"night",  name:"Midnight", cost:1500, pal:{ p:"#262a40", q:"#0f1018", h:"#3b5dc9", g:"#73eff7" }, bolt:["#41a6f6","#73eff7"] },
+    { id:"gold",   name:"Golden",   cost:2200, pal:{ p:"#e0a030", q:"#8f563b", h:"#ffcd75", g:"#f4f4f4" }, bolt:["#ffcd75","#f4f4f4"] }
+  ];
+  function robe() {
+    for (var i = 0; i < ROBES.length; i++) if (ROBES[i].id === save.robe) return ROBES[i];
+    return ROBES[0];
+  }
+
+  /* ---------- audio ---------- */
+  var ac = null;
+  function audio() {
+    if (!save.sound) return null;
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+    } catch (e) { return null; }
+    return ac;
+  }
+  // The piano voice from Find the Note; the bass variant swaps the partials.
+  function tone(midi, at, dur, vol, bass) {
+    var a = audio(); if (!a) return;
+    var t = a.currentTime + at, f = 440 * Math.pow(2, (midi - 69) / 12), v = vol || 0.16;
+    var g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    var o1 = a.createOscillator(), o2 = a.createOscillator();
+    o1.type = bass ? "sine" : "triangle"; o1.frequency.value = f;
+    o2.type = bass ? "triangle" : "sine"; o2.frequency.value = f * 2;
+    var g2 = a.createGain(); g2.gain.value = bass ? 0.12 : 0.25;
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(a.destination);
+    o1.start(t); o2.start(t); o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  }
+  function chordTone(notes, at, dur) { notes.forEach(function (m) { tone(m, at, dur, notes.length > 2 ? 0.08 : 0.12); }); }
+  function beep(type, f0, f1, at, dur, vol) {
+    if (!save.sfx) return;
+    var a = audio(); if (!a) return;
+    var t = a.currentTime + at, o = a.createOscillator(), g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  var noiseBuf = null;
+  function noiseSrc(a) {
+    if (!noiseBuf) {
+      noiseBuf = a.createBuffer(1, a.sampleRate * 0.5, a.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    var s = a.createBufferSource(); s.buffer = noiseBuf;
+    return s;
+  }
+  function noise(at, dur, vol) {
+    if (!save.sfx) return;
+    var a = audio(); if (!a) return;
+    var t = a.currentTime + at, s = noiseSrc(a), g = a.createGain(), f = a.createBiquadFilter();
+    f.type = "lowpass"; f.frequency.value = 1800;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(a.destination);
+    s.start(t); s.stop(t + dur + 0.02);
+  }
+  function ride(at, vol) {
+    var a = audio(); if (!a) return;
+    var t = a.currentTime + at, s = noiseSrc(a), g = a.createGain(), f = a.createBiquadFilter();
+    f.type = "highpass"; f.frequency.value = 7000;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    s.connect(f); f.connect(g); g.connect(a.destination);
+    s.start(t); s.stop(t + 0.3);
+  }
+  function arp(notes, step, vol, type) {
+    notes.forEach(function (m, i) {
+      var f = 440 * Math.pow(2, (m - 69) / 12);
+      beep(type || "square", f, f * 1.001, i * step, step * 1.6, vol);
+    });
+  }
+  // Effects sit after and under the played note so the pitch stays clear.
+  var sfx = {
+    zap:   function () { beep("square", 600, 1500, 0.08, 0.1, 0.03); },
+    poof:  function () { noise(0.0, 0.2, 0.09); },
+    coin:  function () { beep("square", 988, 990, 0, 0.05, 0.025); beep("square", 1319, 1320, 0.05, 0.12, 0.025); },
+    hurt:  function () { beep("square", 330, 70, 0, 0.3, 0.05); noise(0, 0.12, 0.05); },
+    heart: function () { arp([72, 76, 79, 84], 0.07, 0.03); },
+    boss:  function () { arp([45, 44, 43, 42], 0.18, 0.05, "sawtooth"); noise(0, 0.8, 0.05); },
+    win:   function () { arp([72, 76, 79, 84, 79, 84, 88], 0.1, 0.035); },
+    lose:  function () { arp([67, 63, 60, 55], 0.18, 0.04, "triangle"); },
+    click: function () { beep("square", 880, 880, 0, 0.03, 0.02); },
+    buy:   function () { arp([76, 79, 84, 88], 0.06, 0.03); }
+  };
+
+  // A tiny rhythm section: walking-ish bass, Charleston comping, swung ride.
+  // seq: [{notes:[midi], bass: midi, beats}] — returns its length in seconds.
+  function bassOf(pc) { return 40 + pcOf(pc - 4); }
+  function swing(seq, bpm) {
+    var a = audio(); if (!a) return 0;
+    var beat = 60 / (bpm || 132), t = 0.08, swing = beat * 2 / 3;
+    seq.forEach(function (c, i) {
+      var last = i === seq.length - 1, b;
+      tone(c.bass, t, beat * 0.95, 0.24, true);
+      var fifth = c.bass + 7 > 52 ? c.bass - 5 : c.bass + 7;
+      if (c.beats >= 2) tone(fifth, t + beat * (c.beats >= 4 ? 2 : 1), beat * 0.95, 0.2, true);
+      c.notes.forEach(function (m) {
+        tone(m, t, last ? beat * c.beats : beat * 0.9, 0.075);
+        if (!last && c.beats >= 2) tone(m, t + beat + swing, beat * 0.5, 0.06);
+      });
+      for (b = 0; b < c.beats; b++) {
+        ride(t + b * beat, b % 2 ? 0.05 : 0.07);
+        if (b % 2 === 1) ride(t + b * beat + swing, 0.035);
+      }
+      t += c.beats * beat;
+    });
+    return t;
+  }
+  // What the band plays: voicings kept in one octave (G3-F♯4) so they move
+  // smoothly, or, for a lesson demo, the root-position shape that is lit up.
+  function bandSeq(chords, degs, lit) {
+    return chords.map(function (c, i) {
+      var ts = c.tones.filter(function (t) { return !degs || degs.indexOf(t.deg) >= 0; });
+      var notes = lit ? closeVoicing(c, degs) : ts.map(function (t) { return 55 + pcOf(t.pc - 55); });
+      return { notes: notes, bass: bassOf(c.rootPc), beats: i === chords.length - 1 ? 4 : 2 };
+    });
+  }
+
+  /* ---------- monsters & worlds ---------- */
+  var MON = {
+    slime:  { kind:"slime",  name:"slime",     pal:{ a:"#38b764", b:"#257179", c:"#a7f070" } },
+    shroom: { kind:"shroom", name:"mushroom",  pal:{ a:"#b13e53", b:"#5d275d" } },
+    bat:    { kind:"bat",    name:"bat",       pal:{ a:"#9a5fd0", b:"#4a2466" } },
+    ice:    { kind:"slime",  name:"ice slime", pal:{ a:"#73eff7", b:"#3b8fd9", c:"#f4f4f4" } },
+    ghost:  { kind:"ghost",  name:"ghost",     pal:{ a:"#dfe8f0", b:"#94b0c2", c:"#ffffff" } },
+    goblin: { kind:"goblin", name:"goblin",    pal:{ a:"#6bbf3a", b:"#3d7a2a", m:"#b55088" } },
+    note:   { kind:"note",   name:"note",      pal:{ a:"#41a6f6", b:"#3b5dc9", c:"#73eff7", r:"#b13e53" } },
+    gnote:  { kind:"note",   name:"gold note", pal:{ a:"#ffcd75", b:"#ef7d57", c:"#fff2c4", r:"#b13e53" } },
+    pnote:  { kind:"note",   name:"neon note", pal:{ a:"#f4a6ff", b:"#b55088", c:"#ffffff", r:"#5d275d" } },
+    shifter:{ kind:"note",   name:"shape-shifter", pal:{ a:"#ffcd75", b:"#ef7d57", c:"#fff2c4", r:"#b13e53" }, chameleon:true },
+    nghost: { kind:"ghost",  name:"night ghost", pal:{ a:"#a6b8f4", b:"#5b6ee1", c:"#ffffff" } },
+    goon:   { kind:"goblin", name:"goon",      pal:{ a:"#b55088", b:"#5d275d", m:"#29366f" } },
+    cat:    { kind:"cat",    name:"cool cat",  pal:{ a:"#94b0c2", b:"#566c86", r:"#f4a6c0" } },
+    tcat:   { kind:"cat",    name:"alley cat", pal:{ a:"#ef7d57", b:"#b13e53", r:"#ffcd75" } },
+    bcat:   { kind:"cat",    name:"black cat", pal:{ a:"#3d4460", b:"#262a40", r:"#b55088" } },
+    pslime: { kind:"slime",  name:"slime",     pal:{ a:"#b55088", b:"#5d275d", c:"#f4a6ff" } },
+    cham:   { kind:"dragon", name:"chameleon", pal:{ a:"#ffcd75", b:"#ef7d57", c:"#fff2c4", w:"#f4f4f4" }, chameleon:true },
+    lisk:   { kind:"dragon", name:"basilisk",  pal:{ a:"#257179", b:"#1d4a4f", c:"#a7f070", w:"#ffcd75" } },
+    jdragon:{ kind:"dragon", name:"jazz dragon", pal:{ a:"#5d275d", b:"#3a1f3d", c:"#ffcd75", w:"#ffcd75" } }
+  };
+  // The shape-shifters wear a colour per chord quality.
+  var CHAM = {
+    maj7: { a:"#ffcd75", b:"#ef7d57", c:"#fff2c4" },
+    dom7: { a:"#ef7d57", b:"#b13e53", c:"#ffcd75" },
+    m7:   { a:"#41a6f6", b:"#3b5dc9", c:"#73eff7" }
+  };
+  var CLUB_GROUND = ["#e0a060","#c28b5a","#8f563b","#6b3f2c"];
+  var WORLDS = [
+    { type:"hills", sky:["#3b5dc9","#41a6f6","#73c6f6","#b6ecf7"], far:"#6aa9b8", near:"#4f9f6a",
+      ground:["#a7f070","#38b764","#8f563b","#6b3f2c"], clouds:true, decor:["tree","tree","flower"],
+      decorPal:{ a:"#38b764", b:"#257179", c:"#a7f070" }, ambient:null,
+      mons:[MON.slime], boss:{ m:MON.slime, name:"King Slime", scale:3 } },
+    { type:"forest", sky:["#5d275d","#b13e53","#ef7d57","#ffcd75"], far:"#6b2f4f", near:"#333c57",
+      ground:["#38b764","#257179","#5d3a2b","#40291f"], clouds:false, decor:["tree","tree","tree"],
+      decorPal:{ a:"#257179", b:"#1d4a4f", c:"#38b764" }, ambient:"fireflies",
+      mons:[MON.shroom], boss:{ m:MON.shroom, name:"Count Fungula", scale:3 } },
+    { type:"cave", sky:["#0f1018","#171826","#1f2133","#262a40"], far:"#2a2f45", near:"#333c57",
+      ground:["#566c86","#333c57","#262a40","#1a1c2c"], clouds:false, decor:["crystal","crystal","rock"],
+      decorPal:{ a:"#5b6ee1", b:"#29366f", c:"#73eff7" }, ambient:"sparkle",
+      mons:[MON.bat], boss:{ m:MON.bat, name:"Bat Queen", scale:3 } },
+    { type:"peaks", sky:["#3b5dc9","#41a6f6","#94d4f6","#dff3fb"], far:"#94b0c2", near:"#6d87a3",
+      ground:["#f4f4f4","#c5d6e0","#566c86","#333c57"], clouds:true, decor:["pine","pine","rock"],
+      decorPal:{ a:"#257179", b:"#1d4a4f" }, ambient:"snow",
+      mons:[MON.ice], boss:{ m:MON.ice, name:"Frost King", scale:3 } },
+    { type:"swamp", sky:["#333c57","#4a5670","#6f7f8f","#94a7a0"], far:"#46545e", near:"#3b4a45",
+      ground:["#7a8c4a","#55663a","#3d3a2b","#2b291f"], clouds:false, decor:["deadtree","deadtree","rock"],
+      decorPal:{ a:"#4d4a3a", b:"#35322a" }, ambient:"fireflies",
+      mons:[MON.ghost], boss:{ m:MON.ghost, name:"Big Boo", scale:3 } },
+    { type:"castle", sky:["#1a1c2c","#29366f","#3b5dc9","#41a6f6"], far:"#566c86", near:"#333c57",
+      ground:["#94b0c2","#566c86","#333c57","#262a40"], clouds:false, decor:["torch"],
+      decorPal:{}, ambient:null,
+      mons:[MON.goblin], boss:{ m:MON.goblin, name:"Goblin Chief", scale:3 } },
+    { type:"volcano", sky:["#1a1c2c","#5d275d","#b13e53","#ef7d57"], far:"#333c57", near:"#262a40",
+      ground:["#5d275d","#3a1f3d","#262a40","#1a1c2c"], clouds:false, decor:["rock","rock"],
+      decorPal:{}, ambient:"embers",
+      mons:[MON.goblin], boss:{ m:MON.jdragon, name:"The Dragon", scale:2 } },
+    { type:"city", sky:["#29366f","#5d275d","#b13e53","#ef7d57"], far:"#4a2f55", near:"#2a2040",
+      win:"#ffcd75", winFar:"#ef7d57", sun:true,
+      ground:["#94b0c2","#566c86","#333c57","#262a40"], decor:["lamp","bench","lamp"], decorPal:{}, ambient:null,
+      mons:[MON.note], boss:{ m:MON.gnote, name:"Big Band Note", scale:3 } },
+    { type:"city", sky:["#0f1018","#1a1c2c","#29366f","#3b5dc9"], far:"#333c57", near:"#141622",
+      win:"#ffcd75", winFar:"#73eff7", moon:true, stars:true,
+      ground:["#566c86","#333c57","#262a40","#1a1c2c"], decor:["lamp","lamp","bench"], decorPal:{}, ambient:null,
+      mons:[MON.nghost], boss:{ m:MON.nghost, name:"Moody Boo", scale:3 } },
+    { type:"city", sky:["#1a1c2c","#2a2040","#3d2a5a","#5d275d"], far:"#3a2a4f", near:"#16121f",
+      win:"#f4a6ff", winFar:"#73eff7", neon:true, stars:true,
+      ground:["#73eff7","#3b5dc9","#29366f","#1a1c2c"], decor:["lamp","bench","lamp"], decorPal:{}, ambient:"rain",
+      mons:[MON.pnote], boss:{ m:MON.cham, name:"The Chameleon", scale:2 } },
+    { type:"club", wall:["#24121f","#3a1f3d"], curtain:["#b13e53","#5d275d"], neon:"#73eff7",
+      ground:CLUB_GROUND, decor:["table","piano","mic","table"], decorPal:{ a:"#20232f", b:"#6d7fa8" }, ambient:"notes",
+      mons:[MON.cat], boss:{ m:MON.cat, name:"The Bandleader", scale:3 } },
+    { type:"club", wall:["#121626","#1d2540"], curtain:["#3b5dc9","#29366f"], neon:"#f4a6ff",
+      ground:CLUB_GROUND, decor:["table","mic","piano","table"], decorPal:{ a:"#20232f", b:"#6d7fa8" }, ambient:"notes",
+      mons:[MON.bcat], boss:{ m:MON.nghost, name:"The Phantom", scale:3 } },
+    { type:"club", wall:["#22180f","#3d2b1d"], curtain:["#e0a030","#8f563b"], neon:"#73eff7",
+      ground:CLUB_GROUND, decor:["piano","table","mic","table"], decorPal:{ a:"#20232f", b:"#6d7fa8" }, ambient:"notes",
+      mons:[MON.tcat], boss:{ m:MON.jdragon, name:"The Jazz Dragon", scale:2 } }
+  ];
+
+  /* ---------- chapters, levels and their lessons ---------- */
+  var CHAPTERS = [
+    { roman:"I",   tab:"INTERVALS",  title:"The Interval Trail", sub:"Count half steps, name the jumps, then stack them up.", worlds:[0,1,2,3,4,5] },
+    { roman:"II",  tab:"7TH CHORDS", title:"Chord City",         sub:"Stack thirds into the big three: maj7, 7 and m7.",     worlds:[7,8,9] },
+    { roman:"III", tab:"ii-V-I",     title:"The Blue Note Club", sub:"Play the progression behind almost every jazz standard.", worlds:[10,11,12] }
+  ];
+  var NAT_FLATS = NATURALS.concat(["B♭","E♭"]);
+  // Demos are data: [kind, ...args]. demoOf() turns them into a label and keyboard steps.
+  var LEVELS = [
+    { ch:0, name:"Half Steps", world:0, count:8, bossHp:4, hint:"+1 and +2",
+      gen:{ type:"count", semis:[1,2], roots:NATURALS, wheels:true },
+      lesson:{ title:"HALF STEPS", body:[
+        "A <b>half step</b> is the very next key up &mdash; black <i>or</i> white. Never skip a key!",
+        "Two half steps make a <b>whole step</b>.",
+        "Careful: <b>E&rarr;F</b> and <b>B&rarr;C</b> are half steps. No black key sits between them.",
+        "Black keys have two names. The key just above C is <b>C♯</b> (C sharp), and it's also <b>D♭</b> (D flat).",
+        "The sign says <b>D + 1</b>? Start on the blue key, D, and play the key one half step up."],
+        demos:[["count","C",1],["count","E",1],["count","B",1],["count","C",2],["count","E",2]] } },
+    { ch:0, name:"Count the Keys", world:1, count:10, bossHp:5, hint:"count up to 7",
+      gen:{ type:"count", semis:[2,3,4,5,7], roots:NATURALS, wheels:true },
+      lesson:{ title:"COUNT THE KEYS", body:[
+        "Every interval is just a number of half steps. Bigger number, bigger jump.",
+        "To find <b>E + 4</b>, start on E and count every key going up: F <i>1</i>, F♯ <i>2</i>, G <i>3</i>, G♯ <i>4</i>. The answer is <b>G♯</b>.",
+        "The key you start on is step zero &mdash; don't count it.",
+        "Stuck? Press <b>HINT</b> and the keys light up with the count."],
+        demos:[["count","C",4],["count","E",4],["count","D",7],["count","A",3]] } },
+    { ch:0, name:"Thirds", world:2, count:10, bossHp:5, hint:"m3 and M3",
+      gen:{ type:"int", ivs:["m3","M3"], roots:NATURALS, wheels:true },
+      lesson:{ title:"THIRDS", body:[
+        "Intervals have names. Meet the two that build <b>every</b> jazz chord:",
+        "<table><tr><th>m3</th><td>minor 3rd</td><td class=n>3</td><td>half steps &middot; dark</td></tr>" +
+          "<tr><th>M3</th><td>major 3rd</td><td class=n>4</td><td>half steps &middot; bright</td></tr></table>",
+        "Small <b>m</b> = minor, big <b>M</b> = major. They're one half step apart.",
+        "A third always skips one letter: C&rarr;E, D&rarr;F, A&rarr;C. That's why the m3 above C is called <b>E♭</b>, not D♯."],
+        demos:[["iv","C",["M3"]],["iv","C",["m3"]],["iv","A",["m3"]],["iv","D",["M3"]]] } },
+    { ch:0, name:"Fifths & Fourths", world:3, count:10, bossHp:5, hint:"P4, P5 and stacks",
+      gen:{ type:"int", ivs:["P4","P5"], stacks:[["M3","m3"],["m3","M3"]], stackP:0.35, roots:NAT_FLATS, wheels:true },
+      lesson:{ title:"FIFTHS & FOURTHS", body:[
+        "<b>P5</b> &middot; perfect 5th = <b>7</b> half steps. Strong and open: the backbone of every chord.",
+        "<b>P4</b> &middot; perfect 4th = <b>5</b> half steps.",
+        "Now the fun part, <b>interval maths</b>. Stack two thirds: <b>M3 + m3 = P5</b>, because 4 + 3 = 7. And m3 + M3 = P5 too.",
+        "So a sign like <b>C + M3 + m3</b> means: up a M3 to E, then up a m3 to <b>G</b>."],
+        demos:[["iv","C",["P5"]],["iv","C",["P4"]],["iv","C",["M3","m3"]],["iv","A",["m3","M3"]]] } },
+    { ch:0, name:"Sevenths", world:4, count:10, bossHp:5, hint:"M7, m7, P8, M2",
+      gen:{ type:"int", ivs:["M7","m7","P8","M2"], roots:NAT_FLATS, wheels:true },
+      lesson:{ title:"SEVENTHS", body:[
+        "<b>P8</b> &middot; the octave = 12 half steps: the same note, one floor up.",
+        "Sevenths sit just under the octave. Don't count 10 or 11 keys &mdash; use a shortcut:",
+        "<b>M7</b> &middot; major 7th (11) = up an octave, then back <b>a half step</b>.",
+        "<b>m7</b> &middot; minor 7th (10) = up an octave, then back <b>a whole step</b>.",
+        "Also in this land: <b>M2</b>, a whole step (2)."],
+        demos:[["iv","C",["P8"]],["iv","C",["M7"]],["iv","C",["m7"]],["iv","F",["M7"]],["iv","D",["m7"]]] } },
+    { ch:0, name:"The Big Mix", world:5, count:12, bossHp:6, hint:"everything, no help",
+      gen:{ type:"int", ivs:["M2","m3","M3","P4","P5","M6","m7","M7"],
+        stacks:[["M3","m3","M3"],["M3","m3","m3"],["m3","M3","m3"],["M3","m3"]], stackP:0.3,
+        roots:NAT_FLATS.concat(["A♭","F♯"]), wheels:false },
+      lesson:{ title:"THE BIG MIX", body:[
+        "Everything so far, plus <b>M6</b> &middot; major 6th = 9 half steps.",
+        "<div style='overflow-x:auto'><table><tr><th>M2</th><th>m3</th><th>M3</th><th>P4</th><th>P5</th><th>M6</th><th>m7</th><th>M7</th><th>P8</th></tr>" +
+          "<tr><td class=n>2</td><td class=n>3</td><td class=n>4</td><td class=n>5</td><td class=n>7</td><td class=n>9</td><td class=n>10</td><td class=n>11</td><td class=n>12</td></tr></table></div>",
+        "No training wheels now: the sign shows only the interval names.",
+        "Watch for <b>three-jump stacks</b> like <b>C + M3 + m3 + M3</b>: 4 + 3 + 4 = 11, a M7. You just walked up the notes of a chord!"],
+        demos:[["iv","C",["M6"]],["iv","C",["M3","m3","M3"]],["iv","C",["M3","m3","m3"]],["iv","G",["M2"]]] } },
+
+    { ch:1, name:"Triads", world:7, count:8, bossHp:4, hint:"major and minor triads",
+      boss:{ m:MON.gnote, name:"Major Minor", scale:3 },
+      gen:{ type:"chord", quals:["maj","min"], roots:["C","D","E","F","G","A"], voicing:"full", wheels:true },
+      lesson:{ title:"STACK THIRDS: TRIADS", body:[
+        "A <b>chord</b> is three or more notes played together. Jazz builds chords by <b>stacking thirds</b>.",
+        "<b>Major triad</b>, written <b>C</b> = root + M3 + m3 &rarr; C E G. Bright.",
+        "<b>Minor triad</b>, written <b>Cm</b> = root + m3 + M3 &rarr; C E♭ G. Dark.",
+        "Same root, same 5th &mdash; only the <b>3rd</b> moves.",
+        "Play the notes together or one at a time, in any order, in any octave. Each right note turns green."],
+        demos:[["chord","C","maj"],["chord","C","min"],["chord","D","min"],["chord","A","maj"]] } },
+    { ch:1, name:"Major 7", world:7, count:8, bossHp:4, hint:"maj7 chords",
+      boss:{ m:MON.gnote, name:"Sir Major Seven", scale:3 },
+      gen:{ type:"chord", quals:["maj7"], roots:EASY_ROOTS, voicing:"full", wheels:true },
+      lesson:{ title:"MAJOR 7", body:[
+        "Stack one more third and you get a <b>7th chord</b>: the sound of jazz.",
+        "<b>Cmaj7</b> = C E G B &nbsp;&middot;&nbsp; root + M3 + m3 + M3 &nbsp;&middot;&nbsp; notes 1 3 5 7",
+        "Shortcut: <b>major triad + the note a half step below the root</b> (C&rarr;B).",
+        "Sound: dreamy and settled. It feels like <b>home</b>. You'll also see it written CM7 or CΔ7."],
+        demos:[["chord","C","maj7"],["chord","F","maj7"],["chord","G","maj7"],["chord","D","maj7"]] } },
+    { ch:1, name:"Dominant 7", world:8, count:8, bossHp:4, hint:"7 chords",
+      boss:{ m:MON.goon, name:"The Dominator", scale:3 }, mons:[MON.nghost, MON.note],
+      gen:{ type:"chord", quals:["dom7"], roots:["C","F","G","D","B♭","A"], voicing:"full", wheels:true },
+      lesson:{ title:"DOMINANT 7", body:[
+        "<b>C7</b> = C E G B♭ &nbsp;&middot;&nbsp; root + M3 + m3 + m3",
+        "Shortcut: <b>major triad + the note a whole step below the root</b> (C&rarr;B♭).",
+        "A plain <b>7</b> after the letter always means dominant 7.",
+        "Sound: bluesy and restless &mdash; it <b>wants to move</b>. Its 3rd and 7th (E and B♭) are a <b>tritone</b> apart, 6 half steps. That rub is the tension."],
+        demos:[["chord","C","dom7"],["chord","F","dom7"],["chord","G","dom7"],["chord","B♭","dom7"]] } },
+    { ch:1, name:"Minor 7", world:8, count:8, bossHp:4, hint:"m7 chords",
+      gen:{ type:"chord", quals:["m7"], roots:["D","G","A","E","C","F"], voicing:"full", wheels:true },
+      lesson:{ title:"MINOR 7", body:[
+        "<b>Cm7</b> = C E♭ G B♭ &nbsp;&middot;&nbsp; root + m3 + M3 + m3",
+        "Shortcut: <b>minor triad + the note a whole step below the root</b>.",
+        "Also written C-7 or Cmin7. Sound: smooth, mellow, a little cool.",
+        "Compare it with C7: only the 3rd is different (E♭ instead of E)."],
+        demos:[["chord","C","m7"],["chord","D","m7"],["chord","A","m7"],["chord","G","m7"]] } },
+    { ch:1, name:"Shape-Shifters", world:9, count:4, bossHp:2, hint:"maj7 → 7 → m7",
+      mons:[MON.shifter],
+      gen:{ type:"cham", roots:EASY_ROOTS },
+      lesson:{ title:"SHAPE-SHIFTERS", body:[
+        "The big three are only <b>one note apart</b>:",
+        "<table><tr><th>Cmaj7</th><td>C E G B</td><td></td></tr>" +
+          "<tr><th>C7</th><td>C E G <b>B♭</b></td><td>lower the 7th</td></tr>" +
+          "<tr><th>Cm7</th><td>C <b>E♭</b> G B♭</td><td>lower the 3rd</td></tr></table>",
+        "Every monster here shape-shifts through maj7, then 7, then m7 on the same root. Keep holding your keys and move <b>just one finger</b> &mdash; held notes count!"],
+        demos:[["shift","C"],["shift","F"],["shift","D"]] } },
+    { ch:1, name:"All Twelve Roots", world:9, count:10, bossHp:6, hint:"all three, any root",
+      boss:{ m:MON.bcat, name:"The Sphinx Cat", scale:3 }, mons:[MON.pnote, MON.note],
+      gen:{ type:"chord", quals:["maj7","dom7","m7"], roots:null, voicing:"full", wheels:false },
+      lesson:{ title:"ALL TWELVE ROOTS", body:[
+        "Any root, any of the big three. No formulas on the sign now.",
+        "<table><tr><th>maj7</th><td>major triad</td><td>+ a half step below the root</td></tr>" +
+          "<tr><th>7</th><td>major triad</td><td>+ a whole step below the root</td></tr>" +
+          "<tr><th>m7</th><td>minor triad</td><td>+ a whole step below the root</td></tr></table>",
+        "Black-key roots like D♭ or F♯ work exactly the same way: build the triad, then add the 7th."],
+        demos:[["chord","D♭","maj7"],["chord","E","dom7"],["chord","F♯","m7"],["chord","A♭","maj7"]] } },
+
+    { ch:2, name:"Meet ii-V-I", world:10, count:4, hint:"in C, F and G",
+      gen:{ type:"prog", pid:"iiVI", keys:["C","F","G"], voicing:"full", names:true }, bossKeys:["C","F"],
+      lesson:{ title:"ii-V-I: THE JAZZ PROGRESSION", body:[
+        "Number the notes of the C major scale: C <i>1</i> D <i>2</i> E <i>3</i> F <i>4</i> G <i>5</i> A <i>6</i> B <i>7</i>.",
+        "Build a 7th chord on steps 2, 5 and 1, using only notes from the scale:",
+        "<table><tr><th>ii</th><td>Dm7</td><td>D F A C</td></tr><tr><th>V</th><td>G7</td><td>G B D F</td></tr>" +
+          "<tr><th>I</th><td>Cmaj7</td><td>C E G B</td></tr></table>",
+        "That's <b>ii&ndash;V&ndash;I</b> (&ldquo;two-five-one&rdquo;). It's in nearly every jazz standard: the V builds tension, the I lands home.",
+        "Each monster is one ii&ndash;V&ndash;I. Play the three chords in order. Beat it and the band plays it back!"],
+        demos:[["scale","C"],["prog","C","iiVI","full"],["prog","F","iiVI","full"]] } },
+    { ch:2, name:"Any Key", world:10, count:4, hint:"names hidden",
+      boss:{ m:MON.lisk, name:"Count Basilisk", scale:2 }, mons:[MON.cat, MON.note],
+      gen:{ type:"prog", pid:"iiVI", keys:["C","F","B♭","G","D","E♭"], voicing:"full", names:false }, bossKeys:["B♭","E♭"],
+      lesson:{ title:"ii-V-I IN ANY KEY", body:[
+        "No need to write out the scale. Count from the key's root, the <b>I</b>:",
+        "<table><tr><th>ii</th><td>a whole step up (M2)</td><td>minor 7</td></tr>" +
+          "<tr><th>V</th><td>a P5 up (or a P4 down)</td><td>dominant 7</td></tr>" +
+          "<tr><th>I</th><td>the root itself</td><td>major 7</td></tr></table>",
+        "In F: <b>Gm7 &rarr; C7 &rarr; Fmaj7</b>. Notice the roots jump up a 4th each time: G&rarr;C&rarr;F.",
+        "Chord names are hidden now &mdash; work them out from the key. HINT shows the chord."],
+        demos:[["prog","F","iiVI","full"],["prog","B♭","iiVI","full"],["prog","G","iiVI","full"]] } },
+    { ch:2, name:"Shell Voicings", world:11, count:4, hint:"R 3 7 only",
+      boss:{ m:MON.pslime, name:"Shell Shocker", scale:3 },
+      gen:{ type:"prog", pid:"iiVI", keys:["C","F","B♭","E♭","G","D"], voicing:"shell", names:true }, bossKeys:["E♭","A♭"],
+      lesson:{ title:"SHELL VOICINGS", body:[
+        "Jazz pianists often <b>leave out the 5th</b> &mdash; it adds little colour.",
+        "A <b>shell</b> = root + 3rd + 7th. Three notes, all the flavour.",
+        "<table><tr><th>Dm7</th><td>D F C</td></tr><tr><th>G7</th><td>G B F</td></tr><tr><th>Cmaj7</th><td>C E B</td></tr></table>",
+        "Here you only need R, 3 and 7. The 5th is allowed, never needed. Try the root in your left hand and the 3rd and 7th in your right."],
+        demos:[["prog","C","iiVI","shell"],["prog","F","iiVI","shell"],["prog","B♭","iiVI","shell"]] } },
+    { ch:2, name:"Guide Tones", world:11, count:4, hint:"just 3 and 7",
+      mons:[MON.bcat, MON.nghost],
+      gen:{ type:"prog", pid:"iiVI", keys:["C","F","B♭","E♭","G","D"], voicing:"guide", names:true }, bossKeys:["G","D"],
+      lesson:{ title:"GUIDE TONES", body:[
+        "The <b>3rd and 7th</b> alone tell you a chord's quality. They're the <b>guide tones</b>.",
+        "In ii&ndash;V&ndash;I they make a beautiful line:",
+        "<table><tr><th>Dm7</th><td>F + C</td></tr><tr><th>G7</th><td>F + <b>B</b></td></tr><tr><th>Cmaj7</th><td><b>E</b> + B</td></tr></table>",
+        "Each time one note <b>stays put</b> and the other <b>slides down a half step</b> (C&rarr;B, then F&rarr;E). That smooth line is the secret of jazz voice-leading.",
+        "Play only the 3rd and 7th. Hold the note that stays &mdash; it counts!"],
+        demos:[["guide","C"],["guide","F"],["guide","B♭"]] } },
+    { ch:2, name:"Turnaround", world:12, count:3, hint:"I-vi-ii-V",
+      boss:{ m:MON.goon, name:"Mister Turnaround", scale:3 },
+      gen:{ type:"prog", pid:"turn", keys:["C","F","B♭","G","E♭"], voicing:"shell", names:true }, bossKeys:["C","F"],
+      lesson:{ title:"THE TURNAROUND", body:[
+        "The other everywhere-progression loops back home, so songs use it to end a section and go round again:",
+        "<table><tr><th>I</th><th>vi</th><th>ii</th><th>V</th></tr><tr><td>Cmaj7</td><td>Am7</td><td>Dm7</td><td>G7</td></tr></table>",
+        "<b>vi</b> = a minor 7 on step 6 of the scale: a M6 up from the key (or a m3 down).",
+        "You'll hear it in &lsquo;I Got Rhythm&rsquo;, &lsquo;Blue Moon&rsquo; and countless pop songs. Shells are fine here: R 3 7."],
+        demos:[["prog","C","turn","shell"],["prog","F","turn","shell"]] } },
+    { ch:2, name:"All Twelve Keys", world:12, count:5, hint:"the final gig",
+      mons:[MON.tcat, MON.cat, MON.gnote],
+      gen:{ type:"prog", pid:"iiVI", keys:KEYS12, voicing:"shell", names:false }, bossKeys:["D","C","B♭"],
+      lesson:{ title:"ALL TWELVE KEYS", body:[
+        "The final gig: ii&ndash;V&ndash;I in any of the 12 keys, chord names hidden. Shells are enough (R 3 7).",
+        "<b>ii</b> = whole step up, m7 &nbsp;&middot;&nbsp; <b>V</b> = P5 up, 7 &nbsp;&middot;&nbsp; <b>I</b> = the key, maj7",
+        "The Jazz Dragon plays ii&ndash;V&ndash;Is falling in whole steps &mdash; D, then C, then B♭ &mdash; just like the standard <b>&lsquo;Tune Up&rsquo;</b>.",
+        "The Notebook has a cheat sheet with all 12 keys. Swing hard!"],
+        demos:[["prog","D","iiVI","shell"],["prog","C","iiVI","shell"],["prog","B♭","iiVI","shell"]] } }
+  ];
+  function unlocked(i) { return i === 0 || save.unlockAll || (save.stars[i - 1] || 0) > 0; }
+  function chapterOpen(c) { return unlocked(c * 6); }
+  function levelBoss(L) { return L.boss || WORLDS[L.world].boss; }
+
+  /* ---------- canvas ---------- */
+  var W = 320, H = 180, GROUND = 150;
+  var cv = $("game"), ctx = cv.getContext("2d"), SC = 1;
+  // Draw at a whole multiple of the 320×180 grid so every art pixel is the
+  // same size; the browser only ever scales the result down.
+  function fit() {
+    var r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    var cssW = Math.max(r.width, r.height * 16 / 9, 320);
+    var s = clamp(Math.ceil(cssW * dpr / W), 1, 8);
+    if (s !== SC || cv.width !== W * s) { SC = s; cv.width = W * s; cv.height = H * s; }
+  }
+  function mk(w, h) { var c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /* backgrounds are drawn once per world into tiling strips */
+  var layerCache = {};
+  function wave(x, parts, width) {
+    var v = 0;
+    parts.forEach(function (p) { v += p[0] * Math.sin(2 * Math.PI * (x * p[1] / width) + p[2]); });
+    return v;
+  }
+  function ridge(x, parts, width) {        // pointy peaks for mountains
+    var v = 0;
+    parts.forEach(function (p) {
+      var ph = ((x * p[1] / width + p[2]) % 1 + 1) % 1;
+      v += p[0] * (Math.abs(ph - 0.5) * 2);
+    });
+    return v;
+  }
+  function band(c, cols, top, bottom) {
+    var x = c.getContext("2d"), n = cols.length, bh = (bottom - top) / n, i, y, xx;
+    for (i = 0; i < n; i++) {
+      x.fillStyle = cols[i];
+      x.fillRect(0, Math.round(top + i * bh), c.width, Math.ceil(bh) + 1);
+    }
+    for (i = 1; i < n; i++) {               // checker dither where two bands meet
+      y = Math.round(top + i * bh);
+      x.fillStyle = cols[i];
+      for (xx = 0; xx < c.width; xx += 2) { x.fillRect(xx, y - 2, 1, 1); x.fillRect(xx + 1, y - 4, 1, 1); }
+      x.fillStyle = cols[i - 1];
+      for (xx = 0; xx < c.width; xx += 2) { x.fillRect(xx + 1, y + 1, 1, 1); x.fillRect(xx, y + 3, 1, 1); }
+    }
+    x.fillStyle = cols[n - 1]; x.fillRect(0, bottom, c.width, c.height - bottom);
+  }
+  function layers(wi) {
+    if (layerCache[wi]) return layerCache[wi];
+    var wd = WORLDS[wi], R = rng(wi * 7919 + 17), LW = 640;
+    var sky = mk(W, H), far = mk(LW, H), mid = mk(LW, H), gnd = mk(64, H - GROUND);
+    var fx = far.getContext("2d"), mx = mid.getContext("2d"), gx = gnd.getContext("2d");
+    fx.imageSmoothingEnabled = false; mx.imageSmoothingEnabled = false;
+    var i, x, y, h, torches = [];
+
+    if (wd.sky) band(sky, wd.sky, 0, 128);
+    var sx = sky.getContext("2d");
+    if (wd.type === "castle" || wd.type === "volcano" || wd.type === "cave") {
+      for (i = 0; i < 40; i++) {
+        sx.fillStyle = i % 5 ? "rgba(244,244,244,.5)" : "#f4f4f4";
+        sx.fillRect(Math.floor(R() * W), Math.floor(R() * 70), 1, 1);
+      }
+    }
+    if (wd.type === "hills" || wd.type === "peaks") {        // a chunky sun
+      sx.fillStyle = "#ffcd75";
+      sx.fillRect(262, 22, 16, 16); sx.fillRect(260, 24, 20, 12); sx.fillRect(264, 20, 12, 20);
+      sx.fillStyle = "#fff2c4"; sx.fillRect(264, 24, 4, 4);
+    }
+    if (wd.type === "forest") {                               // setting sun behind the trees
+      sx.fillStyle = "#ffe9a8";
+      sx.fillRect(140, 70, 40, 30); sx.fillRect(136, 74, 48, 26); sx.fillRect(144, 66, 32, 34);
+    }
+    if (wd.type === "swamp") {                                // pale moon
+      sx.fillStyle = "#dfe8f0"; sx.fillRect(60, 26, 14, 14); sx.fillRect(58, 28, 18, 10); sx.fillRect(62, 24, 10, 18);
+      sx.fillStyle = "#94a7a0"; sx.fillRect(64, 30, 3, 3); sx.fillRect(68, 35, 2, 2);
+    }
+
+    function colFill(c, color, fn, step) {
+      var cx = c.getContext("2d"); cx.fillStyle = color;
+      for (var xx = 0; xx < LW; xx += step) {
+        var hh = Math.round(fn(xx) / 2) * 2;
+        cx.fillRect(xx, hh, step, H - hh);
+      }
+    }
+
+    if (wd.type === "hills" || wd.type === "forest" || wd.type === "swamp") {
+      colFill(far, wd.far, function (xx) { return 96 + wave(xx, [[10,2,0.4],[5,5,1.3],[2,11,2]], LW); }, 2);
+      colFill(far, wd.near, function (xx) { return 116 + wave(xx, [[7,3,2.1],[4,7,0.2],[2,13,1]], LW); }, 2);
+    }
+    if (wd.type === "forest") {                    // a wall of round treetops
+      fx.fillStyle = "#2a2440";
+      for (x = 0; x < LW; x += 10) {
+        h = 104 + Math.round(R() * 12);
+        for (y = 0; y < 14; y += 2) {
+          var hw = Math.round(Math.sqrt(Math.max(0, 49 - (y - 7) * (y - 7))));
+          fx.fillRect(x + 5 - hw, h + y, hw * 2, 2);
+        }
+        fx.fillRect(x, h + 10, 10, H);
+      }
+    }
+    if (wd.type === "peaks") {
+      colFill(far, wd.far, function (xx) { return 62 + ridge(xx, [[34,4,0.1],[14,9,0.35]], LW); }, 2);
+      fx.fillStyle = "#f4f4f4";
+      for (x = 0; x < LW; x += 2) {
+        h = Math.round((62 + ridge(x, [[34,4,0.1],[14,9,0.35]], LW)) / 2) * 2;
+        if (h < 84) fx.fillRect(x, h, 2, Math.round((84 - h) / 2) * 2 > 10 ? 10 : Math.round((84 - h) / 2) * 2 + 2);
+      }
+      colFill(far, wd.near, function (xx) { return 108 + ridge(xx, [[16,6,0.7],[6,15,0.2]], LW); }, 2);
+    }
+    if (wd.type === "cave") {
+      colFill(far, wd.far, function (xx) { return 100 + wave(xx, [[8,3,0],[5,8,1]], LW); }, 2);
+      colFill(far, wd.near, function (xx) { return 120 + wave(xx, [[6,5,1],[3,12,2]], LW); }, 2);
+      fx.fillStyle = wd.near;                       // stalactites
+      fx.fillRect(0, 0, LW, 8);
+      for (x = 0; x < LW; x += 2) {
+        h = 8 + Math.round(Math.max(0, wave(x, [[10,7,0.3],[8,17,1.1],[6,29,2.7]], LW)) / 2) * 2;
+        fx.fillRect(x, 0, 2, h);
+      }
+    }
+    if (wd.type === "volcano") {
+      colFill(far, wd.far, function (xx) { return 80 + ridge(xx, [[30,3,0.2],[10,11,0.5]], LW); }, 2);
+      fx.fillStyle = "#ef7d57";                      // lava rivers on the slopes
+      for (i = 0; i < 6; i++) {
+        x = Math.floor(R() * LW);
+        for (y = 0; y < 30; y += 2) fx.fillRect(x + Math.round(Math.sin(y / 5) * 3), 96 + y, 2, 2);
+      }
+      colFill(far, wd.near, function (xx) { return 118 + ridge(xx, [[10,8,0.1],[5,19,0.6]], LW); }, 2);
+    }
+    if (wd.type === "castle") {                      // a brick hall with night windows
+      fx.fillStyle = wd.far; fx.fillRect(0, 0, LW, H);
+      fx.fillStyle = "#4a5d75";
+      for (y = 0; y < H; y += 8) {
+        fx.fillRect(0, y, LW, 1);
+        for (x = (y / 8) % 2 ? 8 : 0; x < LW; x += 16) fx.fillRect(x, y, 1, 8);
+      }
+      fx.fillStyle = "#6d819a";
+      for (i = 0; i < 90; i++) fx.fillRect(Math.floor(R() * LW / 16) * 16 + 2, Math.floor(R() * H / 8) * 8 + 2, 6, 1);
+      for (x = 40; x < LW; x += 160) {
+        fx.fillStyle = "#1a1c2c"; fx.fillRect(x - 2, 38, 28, 58); fx.fillRect(x, 34, 24, 4); fx.fillRect(x + 4, 30, 16, 4);
+        fx.fillStyle = "#29366f"; fx.fillRect(x, 40, 24, 54); fx.fillRect(x + 2, 36, 20, 4); fx.fillRect(x + 6, 32, 12, 4);
+        fx.fillStyle = "#f4f4f4"; fx.fillRect(x + 6, 48, 1, 1); fx.fillRect(x + 17, 60, 1, 1); fx.fillRect(x + 10, 76, 1, 1);
+        fx.fillStyle = "#1a1c2c"; fx.fillRect(x + 11, 36, 2, 58); fx.fillRect(x, 64, 24, 2);
+        fx.fillStyle = "#b13e53"; fx.fillRect(x + 64, 20, 22, 44);            // banner
+        fx.fillStyle = "#5d275d"; fx.fillRect(x + 64, 64, 8, 6); fx.fillRect(x + 78, 64, 8, 6);
+        fx.fillStyle = "#ffcd75"; fx.fillRect(x + 72, 34, 6, 6); fx.fillRect(x + 70, 36, 10, 2); fx.fillRect(x + 74, 32, 2, 10);
+      }
+    }
+    if (wd.clouds) {
+      var cl = sprite("cloud");
+      for (i = 0; i < 5; i++) fx.drawImage(cl, Math.floor(i * LW / 5 + R() * 60), 14 + Math.floor(R() * 34));
+    }
+
+    if (wd.type === "city") cityLayers(wd, R, sky, far, LW);
+    if (wd.type === "club") clubLayers(wd, R, sky, far, LW);
+
+    // mid layer: scenery standing on the horizon behind the path
+    var dp = wd.decorPal;
+    for (x = 12; x < LW - 40; x += 44 + Math.floor(R() * 60)) {
+      var name = wd.decor[Math.floor(R() * wd.decor.length)], img = sprite(name, dp, "w" + wi);
+      if (name === "torch") {
+        mx.drawImage(img, x, 70, img.width * 2, img.height * 2);
+        torches.push(x + 5);
+        x += 60;
+        continue;
+      }
+      if (name === "lamp") {                     // a pool of lamplight around the head
+        mx.fillStyle = "rgba(255,205,117,.10)"; mx.fillRect(x - 12, GROUND - 52, 38, 30);
+        mx.fillStyle = "rgba(255,205,117,.14)"; mx.fillRect(x - 5, GROUND - 46, 24, 16);
+      }
+      if (name === "table") {                    // candlelight
+        mx.fillStyle = "rgba(255,205,117,.16)"; mx.fillRect(x + 4, GROUND - 26, 16, 12);
+      }
+      var sc = name === "flower" || name === "rock" ? 1 : 2;
+      if (name === "flower") { for (i = 0; i < 4; i++) mx.drawImage(img, x + i * 7, GROUND - img.height + 1 - (i % 2)); continue; }
+      mx.drawImage(img, x, GROUND - img.height * sc + 2, img.width * sc, img.height * sc);
+      if (name === "piano") x += 16;
+    }
+
+    // ground tile
+    var gc = wd.ground, GH = H - GROUND;
+    if (wd.type === "club") {                    // stage boards
+      gx.fillStyle = gc[1]; gx.fillRect(0, 0, 64, GH);
+      gx.fillStyle = gc[0]; gx.fillRect(0, 0, 64, 2);
+      gx.fillStyle = gc[3]; gx.fillRect(0, 2, 64, 1);
+      for (y = 3, i = 0; y < GH; y += 5, i++) {
+        gx.fillStyle = gc[2]; gx.fillRect(0, y + 4, 64, 1);
+        gx.fillStyle = gc[3]; gx.fillRect((i * 23) % 64, y, 1, 4); gx.fillRect((i * 23 + 37) % 64, y, 1, 4);
+      }
+      gx.fillStyle = gc[0];
+      for (i = 0; i < 6; i++) gx.fillRect(Math.floor(R() * 60), 4 + Math.floor(R() * (GH - 6)), 3, 1);
+    } else if (wd.type === "city") {             // sidewalk, curb, road
+      gx.fillStyle = gc[1]; gx.fillRect(0, 0, 64, 12);
+      gx.fillStyle = gc[0]; gx.fillRect(0, 0, 64, 2);
+      gx.fillStyle = gc[2]; for (x = 0; x < 64; x += 16) gx.fillRect(x, 2, 1, 10);
+      gx.fillStyle = gc[0]; gx.fillRect(0, 12, 64, 2);
+      gx.fillStyle = gc[3]; gx.fillRect(0, 14, 64, GH - 14);
+      gx.fillStyle = "#ffcd75"; gx.fillRect(8, 22, 18, 2); gx.fillRect(40, 22, 18, 2);
+    } else {
+      gx.fillStyle = gc[2]; gx.fillRect(0, 0, 64, GH);
+      gx.fillStyle = gc[0]; gx.fillRect(0, 0, 64, 3);
+      gx.fillStyle = gc[1];
+      for (x = 0; x < 64; x += 2) gx.fillRect(x, 3, 2, 2 + ((x * 7) % 5 === 0 ? 2 : 0) + ((x * 3) % 7 === 0 ? 1 : 0));
+      gx.fillStyle = gc[0];
+      for (x = 3; x < 64; x += 11) gx.fillRect(x, 3, 1, 2);
+      gx.fillStyle = gc[3];
+      if (wd.type === "castle" || wd.type === "cave") {
+        for (y = 8; y < GH; y += 8) { gx.fillRect(0, y, 64, 1); for (x = (y / 8) % 2 ? 0 : 16; x < 64; x += 32) gx.fillRect(x, y - 7, 1, 7); }
+      } else {
+        for (i = 0; i < 14; i++) gx.fillRect(Math.floor(R() * 31) * 2, 8 + Math.floor(R() * (GH - 10) / 2) * 2, 2, 2);
+        if (wd.type === "volcano") { gx.fillStyle = "#ef7d57"; for (i = 0; i < 4; i++) gx.fillRect(Math.floor(R() * 60), 10 + Math.floor(R() * 16), 4, 1); }
+      }
+    }
+
+    layerCache[wi] = { sky: sky, far: far, mid: mid, gnd: gnd, torches: torches, LW: LW };
+    return layerCache[wi];
+  }
+
+  function hexA(h, a) {
+    var n = parseInt(h.slice(1), 16);
+    return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  }
+  function neonSign(fx, name, x, y, col, s) {
+    var img = sprite(name, { "#": col }, "neon" + col), w = img.width * s, h = img.height * s;
+    fx.fillStyle = hexA(col, 0.10); fx.fillRect(x - 6, y - 6, w + 12, h + 12);
+    fx.fillStyle = hexA(col, 0.14); fx.fillRect(x - 3, y - 3, w + 6, h + 6);
+    fx.drawImage(img, x, y, w, h);
+  }
+  function cityLayers(wd, R, sky, far, LW) {
+    var sx = sky.getContext("2d"), fx = far.getContext("2d"), i, x;
+    if (wd.stars) {
+      for (i = 0; i < 50; i++) {
+        sx.fillStyle = i % 5 ? "rgba(244,244,244,.5)" : "#f4f4f4";
+        sx.fillRect(Math.floor(R() * W), Math.floor(R() * 64), 1, 1);
+      }
+    }
+    if (wd.moon) {
+      sx.fillStyle = "#f4f4f4"; sx.fillRect(248, 20, 14, 14); sx.fillRect(246, 22, 18, 10); sx.fillRect(250, 18, 10, 18);
+      sx.fillStyle = "#c5d6e0"; sx.fillRect(252, 24, 3, 3); sx.fillRect(257, 29, 2, 2);
+    }
+    if (wd.sun) {                                     // a big striped sunset behind the towers
+      sx.fillStyle = "#ffcd75";
+      for (i = -22; i <= 22; i += 2) {
+        var hw = Math.round(Math.sqrt(22 * 22 - i * i));
+        sx.fillRect(170 - hw, 92 + i, hw * 2, 2);
+      }
+      sx.fillStyle = "#ef7d57";
+      for (i = 0; i < 4; i++) sx.fillRect(140, 96 + i * 5, 60, 1 + (i > 1 ? 1 : 0));
+    }
+    function skyline(col, winCol, minH, maxH, minW, maxW, base, winP, big) {
+      var bx = 0;
+      while (bx < LW) {
+        var bw = minW + Math.floor(R() * (maxW - minW) / 2) * 2, bh = minH + Math.floor(R() * (maxH - minH) / 2) * 2;
+        var top = base - bh, roof = R(), wins = [], wx, wy;
+        for (wy = top + 4; wy < base - 3; wy += big ? 7 : 4)
+          for (wx = bx + 3; wx < bx + bw - 3; wx += big ? 6 : 3)
+            if (R() < winP) wins.push([wx, wy]);
+        [0, -LW].forEach(function (off) {            // draw twice so the strip tiles
+          var ox = bx + off;
+          fx.fillStyle = col;
+          fx.fillRect(ox, top, bw, H - top);
+          if (roof < 0.25) fx.fillRect(ox + Math.floor(bw / 2), top - 8, 1, 8);
+          else if (roof < 0.4) { fx.fillRect(ox + 3, top - 6, 7, 4); fx.fillRect(ox + 4, top - 2, 1, 2); fx.fillRect(ox + 8, top - 2, 1, 2); }
+          else if (roof < 0.55) fx.fillRect(ox + 2, top - 3, bw - 4, 3);
+          fx.fillStyle = winCol;
+          wins.forEach(function (w) { fx.fillRect(w[0] + off, w[1], big ? 2 : 1, big ? 3 : 1); });
+        });
+        bx += bw + (R() < 0.3 ? 2 : 0);
+      }
+    }
+    skyline(wd.far, wd.winFar, 40, 96, 14, 30, GROUND - 6, 0.22, false);
+    skyline(wd.near, wd.win, 20, 60, 22, 44, GROUND, 0.28, true);
+    var cols = wd.neon ? ["#f4a6ff", "#73eff7"] : ["#ffcd75"];
+    for (i = 0; i < (wd.neon ? 4 : 1); i++) {
+      x = 50 + i * 160 + Math.floor(R() * 40);
+      if (i % 2) neonSign(fx, "neonNote", x, GROUND - 44 - Math.floor(R() * 12), cols[i % cols.length], 2);
+      else neonSign(fx, "jazz", x, GROUND - 40 - Math.floor(R() * 12), cols[i % cols.length], 2);
+    }
+  }
+  function clubLayers(wd, R, sky, far, LW) {
+    var sx = sky.getContext("2d"), fx = far.getContext("2d"), x, y, i, dx;
+    sx.fillStyle = wd.wall[0]; sx.fillRect(0, 0, W, H);
+    fx.fillStyle = wd.wall[1]; fx.fillRect(0, 0, LW, H);    // brick wall
+    fx.fillStyle = wd.wall[0];
+    for (y = 0; y < H; y += 6) {
+      fx.fillRect(0, y, LW, 1);
+      for (x = (y / 6) % 2 ? 6 : 0; x < LW; x += 12) fx.fillRect(x, y, 1, 6);
+    }
+    fx.fillStyle = "rgba(255,255,255,.04)";
+    for (i = 0; i < 140; i++) fx.fillRect(Math.floor(R() * LW / 12) * 12 + 1, Math.floor(R() * H / 6) * 6 + 1, 11, 5);
+    for (x = 110; x < LW; x += 320) {                       // neon sign and a framed poster
+      neonSign(fx, "jazz", x, 34, wd.neon, 3);
+      fx.fillStyle = "#ffcd75"; fx.fillRect(x + 130, 48, 22, 30);
+      fx.fillStyle = wd.wall[0]; fx.fillRect(x + 132, 50, 18, 26);
+      var nn = sprite("neonNote", { "#": wd.curtain[0] }, "post" + wd.curtain[0]);
+      fx.drawImage(nn, x + 134, 56, nn.width * 2, nn.height * 2);
+    }
+    for (x = 0; x < LW; x += 2) {                            // valance with folds and a gold trim
+      fx.fillStyle = x % 8 < 4 ? wd.curtain[0] : wd.curtain[1];
+      fx.fillRect(x, 0, 2, 12);
+    }
+    fx.fillStyle = wd.curtain[1];
+    for (x = 0; x < LW; x += 16) for (i = 0; i < 4; i++) fx.fillRect(x + 2 + i, 12 + i, 12 - 2 * i, 1);
+    fx.fillStyle = "#ffcd75"; fx.fillRect(0, 11, LW, 1);
+    for (x = 0; x < LW; x += 320) {                          // side drapes
+      for (dx = 0; dx < 22; dx += 2) {
+        fx.fillStyle = dx % 6 < 3 ? wd.curtain[0] : wd.curtain[1];
+        fx.fillRect(x + dx, 0, 2, GROUND);
+      }
+      fx.fillStyle = "#ffcd75"; fx.fillRect(x + 22, 0, 1, GROUND); fx.fillRect(x + 3, 92, 17, 3);
+    }
+  }
+
+  /* ---------- game state ---------- */
+  var mode = "menu";                 // menu | play | end
+  var run = null, paused = false;
+  var cur = null, locked = true, verdict = null, revealed = false, answer = null;
+  var held = {};
+  var clock = 0, scroll = 0, travel = 0;
+  var hero = { x: 50, castT: 0, hurtT: 0 };
+  var parts = [], floats = [], bolts = [], coinsFly = [], ambient = [];
+  var shakeT = 0, flashT = 0, banner = null, coinBump = 0, lastCoinSfx = 0;
+  var menuWorld = 0, menuWorldT = 0, menuWi = 0;
+  var HOME = 232, BOSS_HOME = 226;
+  var FONT = "'Press Start 2P', ui-monospace, monospace";
+  var KB_LO = 60, KB_HI = 83;
+  // Seconds a monster takes to walk up to you, per task: [slowly, fast].
+  var WALK = { int: [12, 6], chord: [22, 11], prog: [18, 9] };
+  var FAST_MS = { int: 3000, chord: 6000, prog: 5000 };
+
+  function later(sec, fn) { if (run) run.timers.push({ t: clock + sec, fn: fn }); }
+  function task() { return !cur || cur.kind === "int" ? "int" : cur.seq && cur.seq.prog ? "prog" : "chord"; }
+
+  /* ---------- drawing helpers ---------- */
+  var topRows = {};
+  function topRow(name) {                     // first painted row, so crowns sit on heads
+    if (topRows[name] !== undefined) return topRows[name];
+    var rows = SPR[name], j;
+    for (j = 0; j < rows.length; j++) if (/[^.]/.test(rows[j])) break;
+    return (topRows[name] = j);
+  }
+  function blit(img, x, y, s) { ctx.drawImage(img, Math.round(x), Math.round(y), img.width * s, img.height * s); }
+  function text(str, x, y, size, color, align, outline) {
+    ctx.font = size + "px " + FONT;
+    ctx.textAlign = align || "left";
+    ctx.textBaseline = "top";
+    if (outline) {
+      ctx.fillStyle = outline === true ? "#1a1c2c" : outline;
+      var o = Math.max(1, Math.round(size / 8));
+      for (var dx = -o; dx <= o; dx += o) for (var dy = -o; dy <= o + o; dy += o) if (dx || dy) ctx.fillText(str, x + dx, y + dy);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(str, x, y);
+  }
+  function textW(str, size) { ctx.font = size + "px " + FONT; return ctx.measureText(str).width; }
+  function rect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+  function shadow(cx, w) {
+    ctx.fillStyle = "rgba(26,28,44,.35)";
+    ctx.fillRect(Math.round(cx - w / 2 + 2), GROUND - 1, Math.round(w - 4), 2);
+    ctx.fillRect(Math.round(cx - w / 2 + 5), GROUND + 1, Math.round(w - 10), 1);
+  }
+  function tile(img, off) {
+    var o = -Math.round(((off % img.width) + img.width) % img.width);
+    ctx.drawImage(img, o, 0); ctx.drawImage(img, o + img.width, 0);
+  }
+  // The pixel font has no ♯ or ♭, so those come from sprites. The font is
+  // monospaced: every other character advances by exactly its size.
+  var ACC_W = { "♯": 6, "♭": 5 };
+  function rtW(str, size) {
+    var s = size / 8, w = 0;
+    str.split("").forEach(function (ch) { w += ACC_W[ch] ? ACC_W[ch] * s : size; });
+    return w;
+  }
+  function rtext(str, x, y, size, color) {
+    var s = size / 8, buf = "", x0 = x;
+    function flush() { if (buf) { text(buf, x, y, size, color); x += buf.length * size; buf = ""; } }
+    str.split("").forEach(function (ch) {
+      if (!ACC_W[ch]) { buf += ch; return; }
+      flush();
+      var sh = ch === "♯", img = sprite(sh ? "sharp" : "flat", { "#": color }, (sh ? "s" : "f") + color);
+      blit(img, x, y - (sh ? 0 : s), s);
+      x += ACC_W[ch] * s;
+    });
+    flush();
+    return x - x0;
+  }
+
+  /* ---------- effects ---------- */
+  function burst(x, y, cols, n, speed, grav, size) {
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, v = speed * (0.4 + Math.random() * 0.8);
+      parts.push({ x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - speed * 0.4,
+        life: 0.5 + Math.random() * 0.5, t: 0, col: cols[i % cols.length], s: size || 2, g: grav === undefined ? 260 : grav });
+    }
+  }
+  function floater(str, x, y, col, size) {
+    floats.push({ s: str, x: x, y: y, t: 0, dur: 1.0, col: col, size: size || 8 });
+  }
+  function flyCoins(x, y, n) {
+    for (var i = 0; i < n; i++) {
+      coinsFly.push({ sx: x + (Math.random() * 16 - 8), sy: y + (Math.random() * 10 - 5), t: -i * 0.06, dur: 0.55 });
+    }
+  }
+
+  /* ---------- monsters ---------- */
+  function sprName(kind) { return kind === "bat" ? "batA" : kind; }
+  function monSize(m) {
+    var name = sprName(m.spec.kind), rows = SPR[name];
+    return { w: rows[0].length * m.scale, h: rows.length * m.scale, top: topRow(name) * m.scale };
+  }
+  function monFloats(m) { return m.spec.kind === "bat" || m.spec.kind === "ghost"; }
+  function monCenterY(m) {
+    var z = monSize(m);
+    return GROUND - (z.h - z.top) / 2 - (monFloats(m) ? 10 : 0);
+  }
+  function monPal(m) {
+    var spec = m.spec, q = run && run.monster === m && cur && cur.q;
+    if (!spec.chameleon || !CHAM[q]) return { pal: spec.pal, key: spec.name };
+    var pal = {}, k;
+    for (k in spec.pal) pal[k] = spec.pal[k];
+    for (k in CHAM[q]) pal[k] = CHAM[q][k];
+    return { pal: pal, key: spec.name + q };
+  }
+  function drawMonster(m) {
+    if (m.state === "die") return;
+    var spec = m.spec, name = spec.kind;
+    if (name === "bat") name = (Math.floor(clock * 8 + m.seed) % 2) ? "batA" : "batB";
+    var flashing = m.flashT > 0 && Math.floor(m.flashT * 30) % 2 === 0;
+    var mp = monPal(m);
+    var img = flashing ? sprite(name, "flash") : sprite(name, mp.pal, mp.key);
+    var s = m.scale, w = img.width * s, h = img.height * s;
+    var moving = m.state === "enter" || m.state === "attack" || (m.state === "ready" && m.walking);
+    var bob = 0;
+    if (spec.kind === "slime" || spec.kind === "note") bob = -Math.round(Math.abs(Math.sin(clock * (moving ? 10 : 3) + m.seed)) * (moving ? 3 : 1)) * s;
+    else if (monFloats(m)) bob = -10 + Math.round(Math.sin(clock * 3 + m.seed) * 2) * s / 2;
+    else bob = moving ? -(Math.floor(clock * 8 + m.seed) % 2) * s : 0;
+    shadow(m.x, w * (monFloats(m) ? 0.5 : 0.8));
+    var x = Math.round(m.x - w / 2), y = Math.round(GROUND - h + bob);
+    ctx.drawImage(img, x, y, w, h);
+    if (m.boss) {
+      var cr = sprite("crown"), cs = Math.max(2, s - 1);
+      blit(cr, m.x - cr.width * cs / 2 + (spec.kind === "dragon" ? -10 : 0), y + topRow(name) * s - cr.height * cs + s, cs);
+    }
+  }
+  function walkTime() {
+    if (save.speed === "relaxed" || !cur) return 0;
+    return WALK[task()][save.speed === "fast" ? 1 : 0] * (run.monster && run.monster.boss ? 1.4 : 1);
+  }
+  function updateMonster(dt) {
+    var m = run.monster;
+    if (!m) return;
+    m.t += dt;
+    m.flashT = Math.max(0, m.flashT - dt);
+    m.walking = false;
+    if (m.state === "enter") {
+      var k = Math.min(1, m.t / m.dur);
+      m.x = m.x0 + (m.homeX - m.x0) * (1 - (1 - k) * (1 - k));
+      if (k >= 1) { m.state = "ready"; m.t = 0; }
+    } else if (m.state === "ready") {
+      var T = walkTime();
+      if (T && cur && !locked) {
+        m.walking = true;
+        m.x -= (m.homeX - m.reach) / T * dt;
+        if (m.x <= m.reach) { m.x = m.reach; wrong(null); }
+      }
+    } else if (m.state === "attack") {
+      var hitX = m.reach - 14;
+      if (m.t < 0.18) m.x = m.ax + (hitX - m.ax) * (m.t / 0.18);
+      else if (m.t < 0.62) m.x = hitX + (m.homeX - hitX) * ((m.t - 0.18) / 0.44);
+      else { m.x = m.homeX; m.state = "ready"; m.t = 0; }
+    } else if (m.state === "hit") {
+      m.x = m.homeX + Math.round(10 * Math.max(0, 1 - m.t / 0.3));
+      if (m.t > 0.3) { m.x = m.homeX; m.state = "ready"; m.t = 0; }
+    } else if (m.state === "die") {
+      run.monster = null;
+    }
+  }
+
+  function drawHero() {
+    var r = robe(), name = hero.castT > 0 ? "heroCast" : "hero";
+    var hurt = hero.hurtT > 0 && Math.floor(hero.hurtT * 20) % 2 === 0;
+    var img = hurt ? sprite(name, "flash") : sprite(name, r.pal, name + r.id);
+    var walking = travel > 0 || mode === "menu";
+    var bob = walking ? (Math.floor(clock * 8) % 2) * 2 : (Math.floor(clock * 1.6) % 2) * 2;
+    var kx = hero.hurtT > 0 ? -Math.round(hero.hurtT * 10) : 0;
+    shadow(hero.x, 26);
+    ctx.drawImage(img, Math.round(hero.x - 16 + kx), GROUND - 32 - bob, 32, 32);
+  }
+
+  /* ---------- the sign the monster holds up ---------- */
+  var INK = "#1a1c2c", RIGHT = "#2f9c57", WRONG = "#b13e53", DIM = "#a08a6a", MUTE = "#566c86";
+  function wheelText(c) {
+    if (c.count) return "count " + c.semis + (c.semis > 1 ? " keys" : " key") + " up";
+    if (c.parts.length === 1) return IV[c.parts[0]].name + " = " + c.semis + " half steps";
+    return c.parts.map(function (id) { return IV[id].semi; }).join(" + ") + " = " + c.semis + " half steps";
+  }
+  function segW(segs, size) { return segs.reduce(function (w, g) { return w + rtW(g.s, size); }, 0); }
+  function drawSegs(segs, x, y, size) { segs.forEach(function (g) { x += rtext(g.s, x, y, size, g.c); }); }
+  function slotList() { return cur.tones.filter(function (t) { return cur.need[t.deg] || (cur.ok[t.deg] && cur.voicing !== "guide"); }); }
+  function cardsGeo() {
+    var seq = cur.seq;
+    return seq.items.map(function (it, i) {
+      var done = i < cur.seqI || (i === cur.seqI && verdict === "right");
+      var shown = seq.show || done || (i === cur.seqI && (revealed || cur.showSym));
+      var label = shown ? it.sym : "?";
+      return { it: it, label: label, w: Math.max(rtW(it.top, 8), rtW(label, 8)) + 8,
+        state: done ? "done" : i === cur.seqI ? "now" : "next" };
+    });
+  }
+  function boardRows() {
+    var rows = [], show = verdict === "right" || revealed;
+    if (cur.kind === "int") {
+      var q = cur.rootName + " + " + cur.parts.join(" + "), ans = show ? cur.ansName : "?", ansCol = show ? RIGHT : INK;
+      var main = [{ s: q + " = ", c: INK }, { s: ans, c: ansCol }];
+      if (segW(main, 16) > 230) {
+        q = cur.rootName + "+" + cur.parts.join("+");
+        main = [{ s: q + "=", c: INK }, { s: ans, c: ansCol }];
+      }
+      if (segW(main, 16) <= 230) rows.push({ segs: main, size: 16 });
+      else { rows.push({ segs: [{ s: q, c: INK }], size: 16 }); rows.push({ segs: [{ s: "= ", c: INK }, { s: ans, c: ansCol }], size: 16 }); }
+      if (cur.wheels || revealed) rows.push({ segs: [{ s: wheelText(cur), c: MUTE }], size: 8 });
+      if (verdict === "wrong" && answer !== null) rows.push({ segs: [{ s: "you played " + midiName(answer, cur.flat), c: WRONG }], size: 8 });
+    } else {
+      if (cur.seq) rows.push({ cards: true });
+      else {
+        rows.push({ segs: [{ s: cur.sym, c: verdict === "right" ? RIGHT : INK }], size: 16 });
+        if (cur.q === "maj" || cur.q === "min") rows.push({ segs: [{ s: cur.rootName + (cur.q === "maj" ? " major" : " minor"), c: MUTE }], size: 8 });
+      }
+      rows.push({ slots: true });
+      if (cur.wheels) rows.push({ segs: [{ s: QUAL[cur.q].stack, c: MUTE }], size: 8 });
+    }
+    return rows;
+  }
+  function drawCards(x, y, rw, cg) {
+    var title = cur.seq.title, hasTop = !!cur.seq.items[0].top;
+    rtext(title, x + Math.round((rw - rtW(title, 8)) / 2), y, 8, MUTE);
+    y += 12;
+    var tw = cg.reduce(function (a, c) { return a + c.w; }, 0) + (cg.length - 1) * 4;
+    var cx = x + Math.round((rw - tw) / 2), ch = hasTop ? 27 : 16;
+    cg.forEach(function (c) {
+      var edge = c.state === "done" ? RIGHT : c.state === "now" ? INK : DIM;
+      var bg = c.state === "done" ? "#a7f070" : c.state === "now" ? "#ffcd75" : "#eadbb8";
+      var ink = c.state === "next" ? DIM : INK;
+      rect(cx, y, c.w, ch, edge);
+      rect(cx + 1, y + 1, c.w - 2, ch - 2, bg);
+      if (c.state === "now") { rect(cx + 1, y + 1, c.w - 2, 1, edge); rect(cx + 1, y + ch - 2, c.w - 2, 1, edge); }
+      if (hasTop) rtext(c.it.top, cx + Math.round((c.w - rtW(c.it.top, 8)) / 2), y + 4, 8, ink);
+      rtext(c.label, cx + Math.round((c.w - rtW(c.label, 8)) / 2), y + (hasTop ? 15 : 4), 8, ink);
+      cx += c.w + 4;
+    });
+  }
+  function drawSlots(x, y, sl) {
+    var show = revealed || verdict === "right";
+    sl.forEach(function (t, i) {
+      var sx = x + i * 27, got = cur.got[t.pc] !== undefined || cur.extra[t.pc] !== undefined, opt = !cur.need[t.deg];
+      rect(sx, y, 24, 13, opt && !got ? DIM : INK);
+      rect(sx + 1, y + 1, 22, 11, got ? "#a7f070" : show && !opt ? "#d8f5c4" : "#fff8e6");
+      var nm = got || show ? t.name : opt ? "-" : "";
+      if (nm) rtext(nm, sx + Math.round((24 - rtW(nm, 8)) / 2), y + 3, 8, got ? INK : opt ? DIM : RIGHT);
+      rtext(t.deg, sx + Math.round((24 - rtW(t.deg, 8)) / 2), y + 15, 8, opt ? DIM : MUTE);
+    });
+  }
+  function drawBoard() {
+    if (!run || !cur) return;
+    var rows = boardRows(), pad = 7, gap = 5, w = 0, h = 0, cg = null, sl = null;
+    rows.forEach(function (r) {
+      if (r.cards) {
+        cg = cardsGeo();
+        r.w = Math.max(rtW(cur.seq.title, 8), cg.reduce(function (a, c) { return a + c.w; }, 0) + (cg.length - 1) * 4);
+        r.h = 12 + (cur.seq.items[0].top ? 27 : 16);
+      } else if (r.slots) {
+        sl = slotList();
+        r.w = sl.length * 27 - 3; r.h = 23;
+      } else { r.w = segW(r.segs, r.size); r.h = r.size; }
+      w = Math.max(w, r.w); h += r.h;
+    });
+    w += pad * 2; h += gap * (rows.length - 1) + pad * 2;
+    var age = clock - cur.born, pop = age < 0.12 ? Math.round((0.12 - age) * 60) : 0;
+    var x = Math.round(clamp(HOME - w / 2, 76, W - 6 - w)), y = 22 - pop;
+
+    var bg = verdict === "right" ? "#c8f2a8" : verdict === "wrong" ? "#f7cbbd" : "#f4e4c1";
+    var edge = verdict === "right" ? "#38b764" : verdict === "wrong" ? "#b13e53" : "#1a1c2c";
+    var m = run.monster, tx = m ? clamp(Math.round(m.x), x + 10, x + w - 10) : x + w / 2;
+    rect(x + 1, y + 1, w, h, "rgba(26,28,44,.35)");
+    rect(tx - 4, y + h, 9, 2, edge); rect(tx - 3, y + h, 7, 1, bg);
+    rect(tx - 2, y + h + 2, 5, 2, edge); rect(tx - 1, y + h + 1, 3, 2, bg);
+    rect(tx, y + h + 4, 1, 2, edge);
+    rect(x + 1, y, w - 2, h, edge); rect(x, y + 1, w, h - 2, edge);
+    rect(x + 1, y + 1, w - 2, h - 2, bg);
+    rect(x + 1, y + h - 3, w - 2, 2, "rgba(143,86,59,.18)");
+
+    var ry = y + pad;
+    rows.forEach(function (r) {
+      var rx = Math.round(x + (w - r.w) / 2);
+      if (r.cards) drawCards(rx, ry, r.w, cg);
+      else if (r.slots) drawSlots(rx, ry, sl);
+      else drawSegs(r.segs, rx, ry, r.size);
+      ry += r.h + gap;
+    });
+    if (run.paceEnd) {                       // countdown after a miss
+      var left = clamp((run.paceEnd - now()) / run.paceDur, 0, 1);
+      rect(x + 2, y + h - 3, Math.round((w - 4) * left), 2, "#b13e53");
+    }
+  }
+
+  /* ---------- HUD ---------- */
+  function drawHUD() {
+    if (!run) return;
+    var st = run.stats, cfg = run.cfg, i;
+    rect(0, 0, W, 18, "rgba(26,28,44,.6)");
+    if (cfg.hearts) {
+      for (i = 0; i < run.maxHearts; i++) blit(sprite(i < run.hearts ? "heart" : "heartEmpty"), 5 + i * 9, 5, 1);
+    } else {
+      text("STREAK " + st.streak + (st.streak >= 10 ? " x3" : st.streak >= 5 ? " x2" : ""), 5, 5, 8, st.streak >= 5 ? "#ffcd75" : "#f4f4f4");
+    }
+    var cw = textW(String(save.wallet), 8), bump = coinBump > 0 ? -1 : 0;
+    text(String(save.wallet), W - 5, 5 + bump, 8, "#ffcd75", "right");
+    blit(sprite("coin"), W - 5 - cw - 9, 5 + bump, 1);
+
+    var m = run.monster;
+    if (m && m.boss) {
+      text(m.bossName.toUpperCase(), W / 2, 3, 8, "#ef7d57", "center");
+      var bw = 80, bx = W / 2 - bw / 2;
+      rect(bx - 1, 12, bw + 2, 4, "#1a1c2c");
+      rect(bx, 13, bw, 2, "#5d275d");
+      rect(bx, 13, Math.round(bw * m.hp / m.maxHp), 2, "#b13e53");
+    } else if (cfg.level >= 0) {
+      text(caps(cfg.name), W / 2, 3, 8, "#f4f4f4", "center");
+      var pw = 90, px = W / 2 - pw / 2, k = Math.min(1, run.kills / cfg.count);
+      rect(px - 1, 12, pw + 2, 4, "#1a1c2c");
+      rect(px, 13, pw, 2, "#333c57");
+      rect(px, 13, Math.round(pw * k), 2, "#a7f070");
+      blit(sprite("crown"), px + pw + 3, 11, 1);
+    } else {
+      var accu = st.asked ? Math.round(100 * st.right / st.asked) + "%" : "--";
+      text(st.right + "/" + st.asked + " " + accu + " " + median(st.times), W / 2 + 6, 5, 8, "#f4f4f4", "center");
+    }
+    if (mode !== "play") return;
+    if (st.streak >= 3 && cfg.level >= 0) {
+      var cols = ["#ffcd75", "#ef7d57", "#a7f070", "#73eff7"];
+      text("COMBO " + st.streak + (st.streak >= 10 ? "  x3" : st.streak >= 5 ? "  x2" : ""), 5, 22, 8, cols[Math.floor(clock * 8) % 4], "left", true);
+    } else if (cfg.level < 0 && st.best) {
+      text("BEST " + st.best, 5, 22, 8, "#94b0c2", "left", true);
+    }
+    if (paused) text("PAUSED", W / 2, 120, 8, "#f4f4f4", "center", true);
+  }
+
+  /* ---------- update + render ---------- */
+  function update(dt) {
+    clock += dt;
+    if (travel > 0) { travel -= dt; scroll += 120 * dt; }
+    else if (mode === "menu") {
+      scroll += 20 * dt;
+      menuWorldT += dt;
+      if (menuWorldT > 9) { menuWorldT = 0; menuWi++; menuWorld = menuWorlds()[menuWi % menuWorlds().length]; flashT = 0.25; }
+    }
+    hero.castT = Math.max(0, hero.castT - dt);
+    hero.hurtT = Math.max(0, hero.hurtT - dt);
+    shakeT = Math.max(0, shakeT - dt);
+    flashT = Math.max(0, flashT - dt);
+    coinBump = Math.max(0, coinBump - dt);
+    if (banner) { banner.t += dt; if (banner.t > banner.dur) banner = null; }
+
+    if (run && paused) {
+      // Freeze the run: push every deadline back by the time spent paused.
+      run.timers.forEach(function (t) { t.t += dt; });
+      if (run.paceEnd) run.paceEnd += dt * 1000;
+      if (cur) cur.t0 += dt * 1000;
+    } else if (run) {
+      var r = run, due = [];
+      r.timers = r.timers.filter(function (t) { if (t.t <= clock) { due.push(t); return false; } return true; });
+      for (var i = 0; i < due.length && run === r; i++) due[i].fn();
+      if (run) updateMonster(dt);
+      if (run && run.paceEnd && now() >= run.paceEnd) retryNow();
+      if (run && run.stats.streak >= 5 && Math.random() < dt * 14) {
+        var gcol = robe().pal.g;
+        parts.push({ x: hero.x - 12 + Math.random() * 24, y: GROUND - 6 - Math.random() * 30, vx: 0, vy: -20, life: 0.6, t: 0, col: gcol, s: 1, g: 0 });
+      }
+    }
+
+    bolts = bolts.filter(function (b) {
+      b.t += dt;
+      var k = Math.min(1, b.t / b.dur), m = b.m;
+      var tx = m ? m.x : b.tx, ty = m ? monCenterY(m) : b.ty;
+      b.x = b.sx + (tx - b.sx) * k; b.y = b.sy + (ty - b.sy) * k - Math.sin(k * Math.PI) * 10;
+      parts.push({ x: b.x, y: b.y, vx: -30 + Math.random() * 20, vy: Math.random() * 20 - 10, life: 0.25, t: 0, col: b.col[Math.random() < 0.5 ? 0 : 1], s: b.big ? 2 : 1, g: 0 });
+      if (k >= 1) { b.hit(); return false; }
+      return true;
+    });
+    parts = parts.filter(function (p) {
+      p.t += dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.g && p.y > GROUND + 2) { p.y = GROUND + 2; p.vy *= -0.35; p.vx *= 0.7; }
+      return p.t < p.life;
+    });
+    floats = floats.filter(function (f) { f.t += dt; return f.t < f.dur; });
+    coinsFly = coinsFly.filter(function (c) {
+      c.t += dt;
+      if (c.t >= c.dur) {
+        coinBump = 0.12;
+        if (clock - lastCoinSfx > 0.07) { sfx.coin(); lastCoinSfx = clock; }
+        return false;
+      }
+      return true;
+    });
+    updateAmbient(dt);
+  }
+
+  function updateAmbient(dt) {
+    var wd = WORLDS[run ? run.world : menuWorld], kind = wd.ambient;
+    if (ambient.kind !== kind) { ambient = []; ambient.kind = kind; }
+    if (!kind) return;
+    var max = kind === "snow" ? 50 : kind === "rain" ? 70 : kind === "embers" ? 30 : kind === "notes" ? 9 : 14;
+    while (ambient.length < max) {
+      ambient.push({
+        x: Math.random() * W,
+        y: kind === "embers" ? GROUND + Math.random() * 30 : kind === "notes" ? 40 + Math.random() * (GROUND - 40) : Math.random() * GROUND,
+        vx: kind === "snow" ? -8 - Math.random() * 10 : kind === "rain" ? -40 : (Math.random() - 0.5) * 8,
+        vy: kind === "snow" ? 14 + Math.random() * 14 : kind === "rain" ? 170 + Math.random() * 60 :
+          kind === "embers" ? -12 - Math.random() * 18 : kind === "notes" ? -8 - Math.random() * 8 : (Math.random() - 0.5) * 6,
+        ph: Math.random() * 6, c: Math.random() < 0.5 ? 0 : 1
+      });
+    }
+    var slide = travel > 0 ? 120 * dt : 0;
+    ambient.forEach(function (a) {
+      a.x += a.vx * dt - slide * 0.6; a.y += a.vy * dt; a.ph += dt;
+      if (kind === "fireflies" || kind === "sparkle") { a.vx += (Math.random() - 0.5) * 20 * dt; a.vy += (Math.random() - 0.5) * 20 * dt; }
+      if (kind === "notes") a.x += Math.sin(a.ph * 2) * 6 * dt;
+      if (a.x < -4) a.x += W + 8; if (a.x > W + 4) a.x -= W + 8;
+      if (a.y > GROUND + 30) { a.y = -2; }
+      if (a.y < -4) { a.y = kind === "embers" ? GROUND + 20 : GROUND; }
+    });
+  }
+  function drawAmbient() {
+    var kind = ambient.kind;
+    ambient.forEach(function (a) {
+      var x = Math.round(a.x), y = Math.round(a.y);
+      if (kind === "snow") rect(x, y, 1, 1, "#f4f4f4");
+      else if (kind === "rain") rect(x, y, 1, 3, "rgba(148,176,194,.55)");
+      else if (kind === "embers") rect(x, y, 1, 1, Math.sin(a.ph * 6) > 0 ? "#ffcd75" : "#ef7d57");
+      else if (kind === "fireflies") { if (Math.sin(a.ph * 2.5) > 0.2) rect(x, y, 1, 1, "#e8ff8a"); }
+      else if (kind === "sparkle") {
+        var s = Math.sin(a.ph * 3);
+        if (s > 0.6) { rect(x, y - 1, 1, 3, "#73eff7"); rect(x - 1, y, 3, 1, "#73eff7"); }
+        else if (s > 0) rect(x, y, 1, 1, "#5b6ee1");
+      } else if (kind === "notes") {                // little eighth notes drifting up
+        if (y < 30) return;
+        var c = a.c ? "rgba(255,205,117,.75)" : "rgba(115,239,247,.6)";
+        rect(x, y + 3, 2, 2, c); rect(x + 1, y, 1, 4, c); rect(x + 2, y, 1, 1, c); rect(x + 3, y + 1, 1, 1, c);
+      }
+    });
+  }
+  function spotlights() {
+    for (var i = 0; i < 2; i++) {
+      var cx0 = 96 + i * 140, sway = Math.sin(clock * 0.6 + i * 2.1) * 40, y, k, hw;
+      ctx.fillStyle = "rgba(255,240,200,.06)";
+      for (y = 16; y < GROUND; y += 2) {
+        k = (y - 16) / (GROUND - 16); hw = 3 + k * 22;
+        ctx.fillRect(Math.round(cx0 + sway * k - hw), y, Math.round(hw * 2), 2);
+      }
+      ctx.fillStyle = "rgba(255,240,200,.10)";
+      ctx.fillRect(Math.round(cx0 + sway - 26), GROUND - 1, 52, 4);
+    }
+  }
+
+  function render() {
+    fit();
+    ctx.setTransform(SC, 0, 0, SC, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    var wi = run ? run.world : menuWorld, L = layers(wi);
+    var sx = shakeT > 0 ? Math.round((Math.random() * 2 - 1) * 3) : 0, syy = shakeT > 0 ? Math.round((Math.random() * 2 - 1) * 2) : 0;
+    ctx.save();
+    ctx.translate(sx, syy);
+    ctx.drawImage(L.sky, 0, 0);
+    tile(L.far, scroll * 0.2);
+    tile(L.mid, scroll * 0.5);
+    L.torches.forEach(function (tx) {
+      var x = tx - Math.round(((scroll * 0.5) % L.LW + L.LW) % L.LW);
+      [x, x + L.LW].forEach(function (xx) {
+        if (xx < -20 || xx > W + 20) return;
+        var f = Math.floor(clock * 10 + tx) % 3;
+        ctx.fillStyle = "rgba(255,205,117,.10)"; ctx.fillRect(xx - 16 - f, 58 - f, 32 + f * 2, 32 + f * 2);
+        ctx.fillStyle = "rgba(255,205,117,.12)"; ctx.fillRect(xx - 8, 64, 16, 18);
+        rect(xx - 1, 67 - f, 3, 3 + f, f ? "#ffcd75" : "#ef7d57");
+      });
+    });
+    var go = -Math.round(((scroll % 64) + 64) % 64);
+    for (var gx = go; gx < W; gx += 64) ctx.drawImage(L.gnd, gx, GROUND);
+    if (WORLDS[wi].type === "club") spotlights();
+    drawAmbient();
+
+    if (run && run.monster) drawMonster(run.monster);
+    drawHero();
+    bolts.forEach(function (b) {
+      var s = b.big ? 6 : 4;
+      rect(b.x - s / 2 - 1, b.y - s / 2 - 1, s + 2, s + 2, b.col[0]);
+      rect(b.x - s / 2, b.y - s / 2, s, s, b.col[1]);
+    });
+    parts.forEach(function (p) { rect(p.x, p.y, p.s, p.s, p.col); });
+    drawBoard();
+    ctx.restore();
+
+    drawHUD();
+    coinsFly.forEach(function (c) {
+      if (c.t < 0) return;
+      var k = c.t / c.dur, tx = W - 30, ty = 5;
+      var x = c.sx + (tx - c.sx) * k, y = c.sy + (ty - c.sy) * k - Math.sin(k * Math.PI) * 30;
+      blit(sprite("coin"), x - 3, y - 3, 1);
+    });
+    floats.forEach(function (f) {
+      var k = f.t / f.dur;
+      text(f.s, Math.round(f.x), Math.round(f.y - k * 18), f.size, f.col, "center", true);
+    });
+    if (banner) {
+      var bt = banner.t, sc = bt < 0.15 ? bt / 0.15 : 1;
+      var bs = Math.round(16 * sc / 8) * 8 || 8;
+      if (!(banner.blink && Math.floor(bt * 6) % 2)) text(banner.text, W / 2, 56, bs, banner.col || "#ffcd75", "center", true);
+      if (banner.sub && bt > 0.15) text(banner.sub, W / 2, 80, 8, "#f4f4f4", "center", true);
+    }
+    if (flashT > 0) { ctx.fillStyle = "rgba(244,244,244," + (flashT * 2).toFixed(2) + ")"; ctx.fillRect(0, 0, W, H); }
+  }
+
+  /* ---------- runs ---------- */
+  function newStats() { return { asked: 0, right: 0, streak: 0, best: 0, times: [] }; }
+  function caps(s) { return s.replace(/[a-z]+/g, function (w) { return /^(i|ii|vi)$/.test(w) ? w : w.toUpperCase(); }); }
+  function beginRun(cfg) {
+    stopDemo();
+    paused = false;
+    run = {
+      cfg: cfg, world: cfg.world, hearts: cfg.hearts, maxHearts: cfg.hearts,
+      kills: 0, total: 0, bossSpawned: false, stats: newStats(), coins: 0,
+      timers: [], monster: null, lastKey: null, again: false, hinted: false, paceEnd: 0, paceDur: 0, graceUntil: 0, gracePcs: []
+    };
+    mode = "play"; cur = null; locked = true; verdict = null; revealed = false; answer = null;
+    parts = []; floats = []; bolts = []; coinsFly = [];
+    hideOverlays();
+    $("actions").hidden = false;
+    $("skipBtn").hidden = cfg.level >= 0;
+    $("lessonBtn").hidden = cfg.level < 0;
+    $("nextBtn").hidden = true;
+    banner = { text: cfg.level >= 0 ? "LEVEL " + (cfg.level + 1) : "PRACTICE", sub: cfg.level >= 0 ? caps(cfg.name) : "", t: 0, dur: 1.5 };
+    paintKeys();
+    say(cfg.level >= 0 ? "Get ready! In this land: <b>" + LEVELS[cfg.level].hint + "</b>." : "Get ready!");
+    travel = 0.9;
+    later(1.0, function () { spawnMonster(false); });
+  }
+  function beginLevel(i) {
+    var L = LEVELS[i];
+    save.chapter = L.ch;
+    beginRun({ level: i, name: L.name, world: L.world, worlds: [L.world], gen: L.gen, count: L.count,
+      bossHp: L.bossHp, bossKeys: L.bossKeys, hearts: 5 });
+  }
+  function startLevel(i) {
+    if (!save.seen[i]) openLesson(i, "start");
+    else beginLevel(i);
+  }
+  function startFree() {
+    var f = save.free, gen, worlds, count = 10;
+    var easy = f.keys === "easy";
+    if (f.mode === "int") {
+      gen = { type: "int", ivs: f.ivs.length ? f.ivs : ["m3", "M3"], roots: easy ? NATURALS : KEYS12, wheels: false };
+      worlds = CHAPTERS[0].worlds;
+    } else if (f.mode === "chord") {
+      gen = { type: "chord", quals: f.quals.length ? f.quals : ["maj7"], roots: easy ? EASY_ROOTS : null, voicing: f.voicing, wheels: false };
+      worlds = CHAPTERS[1].worlds;
+    } else {
+      gen = { type: "prog", pid: f.pid, keys: easy ? ["C", "F", "B♭", "G", "E♭", "D"] : KEYS12, voicing: f.voicing, names: f.names === "show" };
+      worlds = CHAPTERS[2].worlds; count = 4;
+    }
+    beginRun({ level: -1, name: "Practice", world: worlds[0], worlds: worlds, gen: gen, count: count, bossHp: 3, hearts: 0 });
+  }
+  function toMenu() {
+    stopDemo();
+    run = null; cur = null; locked = true; mode = "menu"; banner = null; travel = 0; paused = false;
+    bolts = []; coinsFly = [];
+    $("actions").hidden = true;
+    persist();
+    paintKeys();
+    showOverlay("menu");
+    say("Pick a level to start your quest!");
+  }
+
+  /* ---------- prompts ---------- */
+  function intPrompt(gen) {
+    var root = note(pick(gen.roots)), parts, semis = 0, ans = root;
+    if (gen.type === "count") {
+      var n = pick(gen.semis);
+      parts = [String(n)]; semis = n;
+      ans = plain(pcN(root) + n, root.a < 0);
+    } else {
+      parts = gen.stacks && Math.random() < (gen.stackP || 0) ? pick(gen.stacks) : [pick(gen.ivs)];
+      parts.forEach(function (id) { semis += IV[id].semi; ans = up(ans, id); });
+    }
+    var rm = 60 + pcN(root);
+    return { kind: "int", key: nameN(root) + parts.join(), rootName: nameN(root), rootMidi: rm, parts: parts,
+      count: gen.type === "count", semis: semis, ansName: nameN(ans), ansMidi: rm + semis, ansPc: pcOf(rm + semis),
+      flat: root.a < 0 || ans.a < 0, wheels: !!gen.wheels };
+  }
+  function chordPrompt(rootName, q, voicing, wheels) {
+    var c = chordOf(rootName, q), v = VOICE[voicing] || VOICE.full;
+    c.kind = "chord"; c.key = c.sym; c.wheels = !!wheels; c.voicing = voicing || "full";
+    c.need = {}; c.ok = {};
+    c.tones.forEach(function (t) {
+      if (v.need.indexOf(t.deg) >= 0) c.need[t.deg] = true;
+      else if (v.ok.indexOf(t.deg) >= 0) c.ok[t.deg] = true;
+    });
+    c.flat = /♭/.test(c.sym + toneNames(c));
+    c.vo = closeVoicing(c);
+    return c;
+  }
+  function seqPrompts(chords, title, show, prog, voicing, key, pid) {
+    var seq = { title: title, show: show, prog: prog, key: key, pid: pid,
+      items: chords.map(function (c) { return { top: c.num || "", sym: c.sym }; }) };
+    return chords.map(function (c, i) {
+      var p = chordPrompt(c.rootName, c.q, voicing, false);
+      p.seq = seq; p.seqI = i; p.num = c.num || "";
+      return p;
+    });
+  }
+  function pickFresh(list) {
+    var v, g = 0;
+    do { v = pick(list); } while (++g < 24 && list.length > 1 && v === run.lastKey);
+    run.lastKey = v;
+    return v;
+  }
+  function pickN(list, n) {
+    var a = list.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = rand(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a.slice(0, n);
+  }
+  function single(gen) {
+    if (gen.type === "count" || gen.type === "int") return intPrompt(gen);
+    var q = pick(gen.quals);
+    return chordPrompt(pick(gen.roots || ROOTS[q]), q, gen.voicing, gen.wheels);
+  }
+  // Each monster carries a queue of prompts; its HP is the queue length.
+  function makeQueue(isBoss) {
+    var cfg = run.cfg, gen = cfg.gen, q = [];
+    if (gen.type === "cham") {
+      (isBoss ? pickN(gen.roots, cfg.bossHp || 2) : [pickFresh(gen.roots)]).forEach(function (r) {
+        var chords = ["maj7", "dom7", "m7"].map(function (k) { return chordOf(r, k); });
+        q = q.concat(seqPrompts(chords, "MOVE ONE FINGER", true, false, "full"));
+      });
+    } else if (gen.type === "prog") {
+      (isBoss ? (cfg.bossKeys || pickN(gen.keys, 2)) : [pickFresh(gen.keys)]).forEach(function (k) {
+        q = q.concat(seqPrompts(progOf(k, gen.pid), "KEY OF " + k + "  " + PROGS[gen.pid].name, gen.names, true, gen.voicing, k, gen.pid));
+      });
+    } else {
+      for (var i = 0, n = isBoss ? cfg.bossHp : 1; i < n; i++) {
+        var p, g = 0;
+        do { p = single(gen); } while (++g < 24 && p.key === run.lastKey);
+        run.lastKey = p.key;
+        q.push(p);
+      }
+    }
+    return q;
+  }
+  function spawnMonster(isBoss) {
+    var wd = WORLDS[run.world], L = run.cfg.level >= 0 ? LEVELS[run.cfg.level] : null;
+    var b = L ? levelBoss(L) : wd.boss, mons = (L && L.mons) || wd.mons;
+    var spec = isBoss ? b.m : pick(mons), queue = makeQueue(isBoss);
+    var m = {
+      spec: spec, scale: isBoss ? b.scale : 2, boss: isBoss, bossName: isBoss ? b.name : "",
+      queue: queue, qi: 0, hp: queue.length, maxHp: queue.length,
+      x: W + 30, x0: W + 30, homeX: isBoss ? BOSS_HOME : HOME, state: "enter", t: 0, dur: isBoss ? 1.3 : 0.45,
+      flashT: 0, seed: Math.random() * 10
+    };
+    m.reach = hero.x + 16 + monSize(m).w / 2 + 2;
+    run.monster = m;
+    travel = m.dur;
+    if (!isBoss) newPrompt();
+  }
+  function toneOf(pc) {
+    for (var i = 0; i < cur.tones.length; i++) if (cur.tones[i].pc === pc) return cur.tones[i];
+    return null;
+  }
+  function chordLabel(c) { return c.q === "maj" ? c.rootName + " major" : c.q === "min" ? c.rootName + " minor" : c.sym; }
+  function needTones(c) { return c.tones.filter(function (t) { return c.need[t.deg]; }); }
+  function revealNotes() { return cur.vo.filter(function (m, k) { return cur.need[cur.tones[k].deg]; }); }
+  function newPrompt(prefix) {
+    if (!run || !run.monster) return;
+    var m = run.monster, p = m.queue[m.qi];
+    if (!p) return;
+    var again = run.again;
+    run.again = false;
+    cur = {};
+    for (var k in p) cur[k] = p[k];
+    cur.t0 = now(); cur.born = clock; cur.got = {}; cur.extra = {}; cur.showSym = false;
+    locked = false; verdict = null; revealed = false; answer = null;
+    run.hinted = false; run.paceEnd = 0;
+    $("nextBtn").hidden = true;
+    // Keys still held from the last chord count, so a held common tone works.
+    if (cur.kind === "chord") for (var h in held) {
+      var t = toneOf(pcOf(+h));
+      if (t && cur.need[t.deg]) cur.got[t.pc] = +h;
+    }
+    $("kbHow").textContent = cur.kind === "int" ? "blue key = where you start" : "any order, any octave";
+    say((prefix || "") + promptMsg(again));
+    paintKeys();
+  }
+  function promptMsg(again) {
+    var c = cur;
+    if (c.kind === "int") {
+      var what = "<b>" + c.rootName + " + " + c.parts.join(" + ") + "</b>";
+      if (again) return "Try again: " + what + ", from the blue key.";
+      if (c.count) return "Start on the blue key, <b>" + c.rootName + "</b>, and go up <b>" + c.semis + "</b> half step" + (c.semis > 1 ? "s" : "") + ".";
+      if (c.parts.length > 1) return "Interval maths: " + what + ". One jump at a time, from the blue key.";
+      return "From the blue key, <b>" + c.rootName + "</b>, go up a <b>" + c.parts[0] + "</b> (" + IV[c.parts[0]].name + ").";
+    }
+    var name = "<b>" + chordLabel(c) + "</b>";
+    if (c.seq && c.seq.prog) {
+      var nm = c.seq.show ? " chord, " + name : " chord";
+      var only = c.voicing === "shell" ? " Just R, 3 and 7." : c.voicing === "guide" ? " Just the 3rd and 7th." : "";
+      if (again) return "Again: the <b>" + c.num + "</b>" + nm + "." + only;
+      if (c.seqI === 0) return "Key of <b>" + c.seq.key + "</b>: play " + PROGS[c.seq.pid].html + ". First the <b>" + c.num + "</b>" + nm + "." + only;
+      return "Now the <b>" + c.num + "</b>" + nm + (c.seqI === c.seq.items.length - 1 ? " &mdash; last one!" : ".");
+    }
+    if (c.seq) {
+      if (again) return "Again: " + name + ".";
+      if (c.seqI % 3 === 0) return "Build " + name + ". Then it shape-shifts!";
+      return "It turned into " + name + "! Move one finger.";
+    }
+    if (again) return "Again: build " + name + ".";
+    return "Build " + name + ": play its " + c.tones.length + " notes, in any order, in any octave.";
+  }
+
+  function press(n) {
+    if (n < 0 || n > 127) return;
+    held[n] = true;
+    tone(n, 0, 0.5);
+    if (mode !== "play" || !cur || locked || paused) { paintKeys(); return; }
+    if (cur.kind === "int") {
+      if (n === cur.rootMidi) { paintKeys(); return; }      // the starting key is free to play
+      answer = n;
+      if (pcOf(n) === cur.ansPc) right(); else wrong(n);
+      return;
+    }
+    if (run.graceUntil > now() && run.gracePcs.indexOf(pcOf(n)) >= 0) { paintKeys(); return; }
+    var t = toneOf(pcOf(n));
+    if (t && cur.need[t.deg]) cur.got[t.pc] = n;
+    else if (t && cur.ok[t.deg]) cur.extra[t.pc] = n;
+    else { wrong(n); return; }
+    if (needTones(cur).every(function (x) { return cur.got[x.pc] !== undefined; })) right();
+    else paintKeys();
+  }
+  function release(n) { delete held[n]; paintKeys(); }
+
+  function right() {
+    locked = true; verdict = "right";
+    var ms = now() - cur.t0, st = run.stats;
+    st.asked++; st.right++; st.streak++; st.times.push(ms);
+    if (st.streak > st.best) st.best = st.streak;
+    paintKeys();
+    hit(ms);
+  }
+  function wrong(n) {
+    locked = true; verdict = "wrong"; answer = n;
+    run.stats.asked++; run.stats.streak = 0;
+    paintKeys();
+    miss(n);
+  }
+
+  var PRAISE = ["Zap!", "Nice!", "Got it!", "Boom!", "Great!", "Yes!", "Swingin'!", "Groovy!", "Cool!"];
+  function hit(ms) {
+    var st = run.stats, m = run.monster, c = cur;
+    var mult = st.streak >= 10 ? 3 : st.streak >= 5 ? 2 : 1;
+    var fast = ms < FAST_MS[task()];
+    var gain = run.hinted ? 0 : (10 + (fast ? 5 : 0)) * mult;
+    hero.castT = 0.25;
+    sfx.zap();
+    m.qi++;
+    var chain = m.qi < m.queue.length && !!c.seq;
+    var r = robe();
+    bolts.push({ sx: hero.x + 12, sy: GROUND - 26, x: hero.x + 12, y: GROUND - 26, t: 0, dur: 0.18, m: m,
+      col: r.bolt, big: st.streak >= 5, hit: function () { impact(m, gain, fast, mult, chain); } });
+    var praise = PRAISE[rand(PRAISE.length)];
+    if (chain) {
+      // Next chord right away, so you can keep playing in time. For a moment,
+      // stray notes of the chord just finished are ignored rather than wrong.
+      run.gracePcs = (run.graceUntil > now() ? run.gracePcs : []).concat(c.tones.map(function (t) { return t.pc; }));
+      run.graceUntil = now() + 350;
+      newPrompt("<span class=good>" + chordLabel(c) + "!</span> ");
+      return;
+    }
+    var msg;
+    if (c.kind === "int") {
+      msg = praise + " " + c.rootName + " + " + c.parts.join(" + ") + " = <span class=good>" + c.ansName + "</span>" +
+        (c.count ? "" : " (" + c.semis + " half steps)");
+    } else {
+      msg = praise + " <span class=good>" + chordLabel(c) + "</span> = " + needTones(c).map(function (t) { return t.name; }).join(" ");
+    }
+    if (fast && !run.hinted) msg += " &mdash; lightning fast!";
+    if (run.hinted) msg = "Now you know it! " + msg.replace(praise + " ", "");
+    say(msg);
+  }
+  function impact(m, gain, fast, mult, chain) {
+    if (!run || run.monster !== m) return;
+    var st = run.stats, cy = monCenterY(m);
+    m.hp--; m.flashT = 0.2;
+    burst(m.x, cy, [robe().bolt[0], "#f4f4f4"], 10, 90, 0, 1);
+    if (gain) {
+      save.wallet += gain; run.coins += gain;
+      flyCoins(m.x, cy, Math.min(8, Math.max(2, gain / 10)));
+      floater((fast ? "FAST! +" : "+") + gain, m.x, cy - 26, fast ? "#73eff7" : "#ffcd75");
+    }
+    if (mult > 1 && (st.streak === 5 || st.streak === 10)) {
+      banner = { text: mult === 3 ? "TRIPLE COINS!" : "DOUBLE COINS!", t: 0, dur: 1.1, col: "#a7f070" };
+    }
+    if (run.cfg.hearts && st.streak > 0 && st.streak % 10 === 0 && run.hearts < run.maxHearts) {
+      run.hearts++;
+      floater("+1 HEART", hero.x + 10, GROUND - 44, "#ef7d57");
+      sfx.heart();
+    }
+    if (m.hp <= 0) killMonster(m);
+    else { m.state = "hit"; m.t = 0; if (!chain) later(0.35, newPrompt); }
+  }
+  // The band plays back the progression a monster was guarding.
+  function playBand(m) {
+    var p = m.queue[0], chords = m.queue.slice();
+    if (p.seq.pid === "turn") chords.push(chordOf(p.seq.key, "maj7"));
+    var t = swing(bandSeq(chords, VOICE[p.voicing].need), 132);
+    if (t) {
+      floater("SWING!", m.x, GROUND - 60, "#ffcd75", 8);
+      say("The band's back! <b>" + chords.map(function (c) { return c.sym; }).join(" &rarr; ") + "</b>");
+    }
+    return t;
+  }
+  function killMonster(m) {
+    var p = m.spec.pal, cy = monCenterY(m), isProg = !!(m.queue[0].seq && m.queue[0].seq.prog);
+    m.state = "die";
+    burst(m.x, cy, [p.a || "#f4f4f4", p.b || "#94b0c2", p.c || "#f4f4f4", "#f4f4f4"], m.boss ? 60 : 24, m.boss ? 160 : 110);
+    sfx.poof();
+    var music = isProg && save.band ? playBand(m) : 0, gap = Math.min(music, 3);
+    if (m.boss) {
+      shakeT = 0.4; flashT = 0.3;
+      for (var i = 0; i < 5; i++) later(0.12 * i, function () { burst(m.x + rand(40) - 20, cy + rand(30) - 15, ["#ffcd75", "#ef7d57", "#f4f4f4"], 14, 120); sfx.poof(); });
+      if (run.cfg.level >= 0) { later(1.1 + gap, levelComplete); return; }
+      var ws = run.cfg.worlds;                     // practice wanders on to the next land
+      run.world = ws[(ws.indexOf(run.world) + 1) % ws.length];
+      run.bossSpawned = false;
+      later(0.9 + gap, function () { flashT = 0.35; banner = { text: "NEW LAND!", t: 0, dur: 1.2 }; });
+      later(1.4 + gap, function () { spawnMonster(false); });
+      persist();
+      return;
+    }
+    run.kills++; run.total++;
+    persist();
+    var bossDue = run.cfg.level >= 0 ? run.kills >= run.cfg.count && !run.bossSpawned : run.total % run.cfg.count === 0;
+    if (bossDue) later(0.6 + gap, bossIntro);
+    else later(0.3 + gap, function () { spawnMonster(false); });
+  }
+  function bossIntro() {
+    cur = null; locked = true; paintKeys();
+    run.bossSpawned = true;
+    var L = run.cfg.level >= 0 ? LEVELS[run.cfg.level] : null, b = L ? levelBoss(L) : WORLDS[run.world].boss;
+    banner = { text: "BOSS!", sub: b.name, t: 0, dur: 1.6, col: "#ef7d57", blink: true };
+    sfx.boss(); shakeT = 0.5;
+    spawnMonster(true);
+    var q = run.monster.queue, how;
+    if (q[0].seq && q[0].seq.prog) {
+      var keys = [];
+      q.forEach(function (p) { if (keys.indexOf(p.seq.key) < 0) keys.push(p.seq.key); });
+      how = "It wants " + PROGS[q[0].seq.pid].html + " in <b>" + keys.join("</b>, then <b>") + "</b>.";
+    } else if (q[0].seq) how = "It shape-shifts " + q.length + " times!";
+    else how = "Hit it " + q.length + " times to win!";
+    say("Uh oh&hellip; <b>" + b.name + "</b> is here! " + how);
+    later(1.6, newPrompt);
+  }
+
+  // Why the answer is what it is, in words a beginner can follow.
+  function why(c) {
+    if (c.count || c.parts.length === 1) {
+      var id = c.parts[0];
+      if (id === "M7") return "up an octave, then back a half step";
+      if (id === "m7") return "up an octave, then back a whole step";
+      if (id === "P8") return "the same note, an octave higher";
+      var names = [];
+      for (var i = 1; i <= c.semis; i++) names.push(midiName(c.rootMidi + i, c.flat));
+      return c.semis + " half step" + (c.semis > 1 ? "s" : "") + " up: " + names.join(", ");
+    }
+    return c.parts.map(function (p) { return IV[p].semi; }).join(" + ") + " = " + c.semis + " half steps";
+  }
+  function missMsg(n) {
+    var c = cur, lead = n === null ? "Too slow! " : "";
+    if (c.kind === "int") {
+      if (n !== null) lead = "Oops, that's <span class=bad>" + midiName(n, c.flat) + "</span>. ";
+      return lead + c.rootName + " + " + c.parts.join(" + ") + " = <b>" + c.ansName + "</b>: " + why(c) + ".";
+    }
+    if (n !== null) lead = "<span class=bad>" + midiName(n, c.flat) + "</span> isn't in it. ";
+    var need = needTones(c), spell = need.map(function (t) { return t.name; }).join(" ");
+    var head = c.seq && c.seq.prog && !c.seq.show
+      ? "The <b>" + c.num + "</b> in " + c.seq.key + " is <b>" + c.sym + "</b>: "
+      : "<b>" + chordLabel(c) + "</b> = ";
+    var degs = c.voicing !== "full" ? " (" + need.map(function (t) { return t.deg; }).join(" ") + ")" : "";
+    return lead + head + spell + degs + ". Play the glowing keys.";
+  }
+  function miss(n) {
+    var m = run.monster;
+    run.again = true;
+    revealed = true;
+    paintKeys();
+    if (m && m.state !== "die") { m.state = "attack"; m.t = 0; m.ax = m.x; }
+    var dead = run.cfg.hearts && run.hearts <= 1;
+    later(0.18, hurtHero);
+    if (cur.kind === "int") { tone(cur.rootMidi, 0.5, 0.5); tone(cur.ansMidi, 0.85, 0.9); }
+    else chordTone(revealNotes(), 0.5, 1.2);
+    say(missMsg(n));
+    if (dead) { later(1.1, gameOver); return; }
+    if (save.pace <= 0) {
+      $("nextBtn").hidden = false;
+    } else {
+      run.paceDur = save.pace * (cur.kind === "int" ? 1 : 1.6);   // chords take longer to read
+      run.paceEnd = now() + run.paceDur;
+    }
+  }
+  function hurtHero() {
+    if (!run) return;
+    if (run.cfg.hearts) run.hearts = Math.max(0, run.hearts - 1);
+    hero.hurtT = 0.5; shakeT = 0.25;
+    sfx.hurt();
+    burst(hero.x, GROUND - 16, ["#b13e53", "#ef7d57", "#f4f4f4"], 10, 70);
+  }
+  function retryNow() {
+    if (!run || mode !== "play" || verdict !== "wrong" || paused) return;
+    run.paceEnd = 0;
+    $("nextBtn").hidden = true;
+    newPrompt();
+  }
+
+  /* ---------- end of a level ---------- */
+  function median(times) {
+    if (!times.length) return "--";
+    var s = times.slice().sort(function (a, b) { return a - b; });
+    return (s[Math.floor(s.length / 2)] / 1000).toFixed(1) + "s";
+  }
+  function factsHTML() {
+    var st = run.stats;
+    return "<dt>Right</dt><dd>" + st.right + " / " + st.asked + "</dd>" +
+      "<dt>Accuracy</dt><dd>" + (st.asked ? Math.round(100 * st.right / st.asked) + "%" : "--") + "</dd>" +
+      "<dt>Best streak</dt><dd>" + st.best + "</dd>" +
+      "<dt>Usual time</dt><dd>" + median(st.times) + "</dd>" +
+      "<dt>Coins</dt><dd>+" + run.coins + "</dd>";
+  }
+  function levelComplete() {
+    mode = "end"; locked = true; cur = null; paintKeys();
+    var st = run.stats, misses = st.asked - st.right, i = run.cfg.level;
+    var stars = misses <= 1 ? 3 : misses <= 4 ? 2 : 1;
+    var last = i === LEVELS.length - 1, chEnd = (i + 1) % 6 === 0, wasOpen = unlocked(i + 1);
+    if (!save.stars[i] || save.stars[i] < stars) save.stars[i] = stars;
+    if (!last && chEnd) save.chapter = LEVELS[i + 1].ch;
+    persist();
+    sfx.win();
+    if (last) swing(bandSeq(progOf("C", "iiVI"), null), 150);
+    banner = { text: chEnd ? "CHAPTER CLEAR!" : "LEVEL CLEAR!", t: 0, dur: 1.2, col: "#a7f070" };
+    for (var k = 0; k < 6; k++) later(0.15 * k, function () { burst(40 + rand(240), 30 + rand(60), ["#ffcd75", "#a7f070", "#73eff7", "#ef7d57", "#f4f4f4"], 16, 120, 120); });
+    $("doneTitle").textContent = last ? "THE CLUB IS SWINGING!" : chEnd ? "CHAPTER CLEAR!" : "LEVEL CLEAR!";
+    var si = spriteURL("star", null, "", 6), se = spriteURL("star", { y: "#333c57", k: "#566c86" }, "empty", 6);
+    $("doneStars").innerHTML = [0, 1, 2].map(function (j) { return '<img alt="" src="' + (j < stars ? si : se) + '">'; }).join("");
+    $("doneStars").setAttribute("aria-label", stars + " of 3 stars");
+    $("doneFacts").innerHTML = factsHTML();
+    var un = $("doneUnlock");
+    un.hidden = last || wasOpen;
+    if (!un.hidden) {
+      var nx = LEVELS[i + 1];
+      un.textContent = chEnd ? "Chapter " + CHAPTERS[nx.ch].roman + " unlocked: " + CHAPTERS[nx.ch].title + "!" : "Level " + (i + 2) + " unlocked: " + nx.name + "!";
+    }
+    $("nextLvl").hidden = last;
+    say(last ? "You did it! Monsters beaten, chords back, band swinging. Keep it up in <b>Practice</b>!"
+      : stars === 3 ? "Perfect! Three stars!" : stars === 2 ? "Great job! Fewer misses gets you three stars." : "You did it! Try again for more stars.");
+    later(1.3, function () { showOverlay("done"); if (!last) $("nextLvl").focus(); });
+  }
+  function gameOver() {
+    mode = "end"; locked = true; cur = null; paintKeys();
+    sfx.lose();
+    persist();
+    $("overFacts").innerHTML = factsHTML();
+    $("overLesson").hidden = run.cfg.level < 0;
+    say("Out of hearts! Every miss teaches your fingers something.");
+    showOverlay("over");
+    $("retryLvl").focus();
+  }
+
+  /* ---------- on-screen keyboard ---------- */
+  var kb = $("kb"), keyEls = {}, tagEls = {}, demoKeys = null;
+  function drawKeys() {
+    var lo = KB_LO, hi = KB_HI;
+    kb.innerHTML = ""; keyEls = {}; tagEls = {};
+    var whitePcs = [0,2,4,5,7,9,11], whites = [], m;
+    for (m = lo; m <= hi; m++) if (whitePcs.indexOf(pcOf(m)) >= 0) whites.push(m);
+    var w = 100 / whites.length;
+    function mkKey(kind, n, left, width) {
+      var b = document.createElement("button");
+      b.className = kind; b.dataset.note = n; b.dataset.kind = kind; b.type = "button";
+      b.style.left = left; b.style.width = width;
+      b.setAttribute("aria-label", midiName(n, false, true));
+      var lb = document.createElement("span"), tg = document.createElement("span");
+      lb.className = "lb"; tg.className = "tg";
+      b.appendChild(lb); b.appendChild(tg);
+      kb.appendChild(b); keyEls[n] = b; tagEls[n] = tg;
+      return lb;
+    }
+    whites.forEach(function (m, i) {
+      var lb = mkKey("w", m, (i * w) + "%", w + "%"), pc = pcOf(m), oct = Math.floor(m / 12) - 1;
+      if (save.labels === "all") lb.textContent = SHARP[pc] + (pc === 0 ? oct : "");
+      else if (save.labels === "c" && pc === 0) lb.textContent = "C" + oct;
+      if ([1,3,6,8,10].indexOf(pcOf(m + 1)) >= 0 && m + 1 <= hi) {
+        mkKey("b", m + 1, "calc(" + ((i + 1) * w) + "% - " + (w * 0.3) + "%)", (w * 0.6) + "%");
+      }
+    });
+    $("kbRange").textContent = midiName(lo, false, true) + " — " + midiName(hi, false, true) + " · tap or play";
+    paintKeys();
+  }
+  // One pass decides every key's colour and its little tag.
+  function paintKeys() {
+    var cls = {}, tags = {}, m, pc;
+    function add(n, c, t) {
+      if (!keyEls[n]) return;
+      if (c) cls[n] = c;
+      if (t !== undefined && t !== null) tags[n] = t;
+    }
+    if (demoKeys) {
+      for (m in demoKeys) add(+m, "demo", demoKeys[m]);
+    } else if (cur && run && mode === "play") {
+      if (cur.kind === "int") {
+        add(cur.rootMidi, "root", cur.rootName);
+        if (revealed) {
+          for (var i = 1; i < cur.semis; i++) add(cur.rootMidi + i, null, String(i));
+          add(cur.ansMidi, verdict === "right" ? "right" : "ghost", String(cur.semis));
+        }
+        if (verdict === "right" && answer !== null) add(answer, "right", cur.ansName);
+      } else {
+        if (revealed) cur.tones.forEach(function (t, k) { if (cur.need[t.deg] && cur.got[t.pc] === undefined) add(cur.vo[k], "ghost", t.deg); });
+        for (pc in cur.got) add(cur.got[pc], "got", toneOf(+pc).deg);
+        for (pc in cur.extra) add(cur.extra[pc], "got", toneOf(+pc).deg);
+      }
+      if (verdict === "wrong" && answer !== null) add(answer, "wrong");
+    }
+    for (m in keyEls) {
+      var n = +m, el = keyEls[m], c = cls[n] || (held[n] ? "held" : "");
+      el.className = el.dataset.kind + (c ? " " + c : "");
+      tagEls[m].textContent = tags[n] !== undefined ? tags[n] : "";
+    }
+  }
+  kb.addEventListener("pointerdown", function (e) {
+    var n = e.target.dataset && e.target.dataset.note;
+    if (!n) return;
+    e.target.setPointerCapture(e.pointerId); press(+n);
+  });
+  kb.addEventListener("pointerup", function (e) {
+    var n = e.target.dataset && e.target.dataset.note; if (n) release(+n);
+  });
+  kb.addEventListener("pointercancel", function (e) {
+    var n = e.target.dataset && e.target.dataset.note; if (n) release(+n);
+  });
+
+  /* ---------- Web MIDI ---------- */
+  var access = null;
+  function setStatus(state, text) { $("status").dataset.on = state; $("statusText").textContent = text; }
+  function showNotice(html) { var n = $("notice"); n.innerHTML = html; n.hidden = false; }
+  function onMessage(e) {
+    var d = e.data, cmd = d[0] & 0xf0;
+    if (cmd === 0x90 && d[2] > 0) press(d[1]);
+    else if (cmd === 0x80 || (cmd === 0x90 && d[2] === 0)) release(d[1]);
+  }
+  function bind() {
+    if (!access) return;
+    access.inputs.forEach(function (i) { i.onmidimessage = null; });
+    var want = $("device").value, any = false;
+    access.inputs.forEach(function (i) {
+      if (want === "all" || i.id === want) { i.onmidimessage = onMessage; any = true; }
+    });
+    setStatus(any ? "live" : "off", any ? "listening" : "no input");
+  }
+  function refresh() {
+    var sel = $("device"), prev = sel.value, opts = [];
+    access.inputs.forEach(function (i) { opts.push({ id: i.id, name: i.name || "MIDI input" }); });
+    sel.innerHTML = "";
+    if (!opts.length) {
+      sel.innerHTML = "<option>No MIDI input found</option>";
+      setStatus("off", "no device");
+      return;
+    }
+    var all = document.createElement("option");
+    all.value = "all"; all.textContent = "All inputs (" + opts.length + ")";
+    sel.appendChild(all);
+    opts.forEach(function (o) {
+      var el = document.createElement("option");
+      el.value = o.id; el.textContent = o.name; sel.appendChild(el);
+    });
+    sel.value = (prev && [].slice.call(sel.options).some(function (o) { return o.value === prev; })) ? prev : "all";
+    bind();
+  }
+  $("device").addEventListener("change", bind);
+  if (!navigator.requestMIDIAccess) {
+    setStatus("off", "no web midi");
+    showNotice("This browser has no Web MIDI. Chrome, Edge and Opera have it. The keyboard on screen works everywhere.");
+  } else {
+    navigator.requestMIDIAccess({ sysex: false }).then(function (a) {
+      access = a; a.onstatechange = refresh; refresh();
+    }).catch(function (err) {
+      setStatus("off", "midi blocked");
+      showNotice("Web MIDI was blocked here (<code>" + (err && err.name ? err.name : "error") +
+        "</code>). Open this page over <code>https</code> or from <code>http://localhost</code>. The keyboard on screen works either way.");
+    });
+  }
+
+  /* ---------- lesson demos ---------- */
+  // A demo is a list of steps; each lights keys (with tags) and usually sounds them.
+  function demoOf(d) {
+    var kind = d[0], steps = [], label = "", dm = {}, i;
+    if (kind === "count") {
+      var r = note(d[1]), rm = 60 + pcN(r), n = d[2], ans = nameN(plain(pcN(r) + n, r.a < 0));
+      label = d[1] + " + " + n + " = " + ans;
+      steps.push({ notes: [rm], tags: [d[1]], gap: 0.6, clear: true });
+      for (i = 1; i <= n; i++) steps.push({ notes: [rm + i], tags: [String(i)], gap: 0.4 });
+      steps.push({ notes: [rm, rm + n], tags: [d[1], ans], gap: 0.6, clear: true, dur: 1.2 });
+    } else if (kind === "iv") {
+      var r2 = note(d[1]), m0 = 60 + pcN(r2), at = r2, mm = m0, all = [m0], allTags = [d[1]];
+      steps.push({ notes: [m0], tags: [d[1]], gap: 0.6, clear: true });
+      d[2].forEach(function (id) {
+        at = up(at, id); mm += IV[id].semi;
+        all.push(mm); allTags.push(nameN(at));
+        steps.push({ notes: [mm], tags: [nameN(at)], gap: 0.6, caption: "+ " + id + " (" + IV[id].semi + ")" });
+      });
+      steps.push({ notes: d[2].length > 1 ? all : [m0, mm], tags: d[2].length > 1 ? allTags : [d[1], nameN(at)], gap: 0.6, clear: true, dur: 1.4 });
+      label = d[1] + " + " + d[2].join(" + ") + " = " + nameN(at);
+    } else if (kind === "chord") {
+      var c = chordOf(d[1], d[2]), vo = closeVoicing(c);
+      label = chordLabel(c);
+      c.tones.forEach(function (t, k) { steps.push({ notes: [vo[k]], tags: [t.name], gap: 0.42, clear: k === 0, caption: t.deg === "R" ? "root" : "the " + t.deg + (t.deg === "3" ? "rd" : "th") }); });
+      steps.push({ notes: vo, tags: c.tones.map(function (t) { return t.name; }), gap: 0.5, clear: true, dur: 1.6, caption: label });
+    } else if (kind === "shift") {
+      label = d[1] + "maj7 → " + d[1] + "7 → " + d[1] + "m7";
+      ["maj7", "dom7", "m7"].forEach(function (q) {
+        var c3 = chordOf(d[1], q), v3 = closeVoicing(c3);
+        steps.push({ notes: v3, tags: c3.tones.map(function (t) { return t.name; }), gap: 1.2, clear: true, dur: 1.1, caption: c3.sym });
+      });
+    } else if (kind === "scale") {
+      var base = 60 + pcN(note(d[1]));
+      label = d[1] + " major scale";
+      [0, 2, 4, 5, 7, 9, 11, 12].forEach(function (s, k) { steps.push({ notes: [base + s], tags: [String(k % 7 + 1)], gap: 0.34, clear: k === 0 }); });
+    } else if (kind === "prog" || kind === "guide") {
+      var pid = kind === "guide" ? "iiVI" : d[2], chords = progOf(d[1], pid), bpm = kind === "guide" ? 96 : 108;
+      if (pid === "turn") { var home = chordOf(d[1], "maj7"); home.num = "I"; chords.push(home); }
+      var beat = 60 / bpm, seq;
+      if (kind === "guide") {
+        // 3rd and 7th kept between D4 and C♯5, so the line moves by half steps.
+        seq = chords.map(function (ch, k) {
+          var g = ch.tones.filter(function (t) { return t.deg === "3" || t.deg === "7"; });
+          return { notes: g.map(function (t) { return 62 + pcOf(t.pc - 62); }), names: g.map(function (t) { return t.name; }),
+            bass: bassOf(ch.rootPc), beats: k === chords.length - 1 ? 4 : 2 };
+        });
+        label = "Guide tones in " + d[1];
+      } else {
+        var degs = VOICE[d[3]].need;
+        seq = bandSeq(chords, degs, true);
+        seq.forEach(function (s, k) { s.names = chords[k].tones.filter(function (t) { return degs.indexOf(t.deg) >= 0; }).map(function (t) { return t.name; }); });
+        label = PROGS[pid].name + " in " + d[1] + (d[3] !== "full" ? ", " + VOICE[d[3]].name + "s" : "");
+      }
+      dm.band = seq; dm.bpm = bpm;
+      seq.forEach(function (s, k) {
+        steps.push({ notes: s.notes, tags: s.names, gap: s.beats * beat, clear: true, silent: true,
+          caption: chords[k].num + " · " + chords[k].sym });
+      });
+    }
+    dm.label = label; dm.steps = steps;
+    return dm;
+  }
+  var demoTok = 0, demoTimers = [], DEMO_NOTE = "Tap a button to hear it and see it on the keyboard below.";
+  function stopDemo() {
+    demoTok++;
+    demoTimers.forEach(clearTimeout); demoTimers = [];
+    $("demoNote").textContent = DEMO_NOTE;
+    if (demoKeys) { demoKeys = null; paintKeys(); }
+  }
+  function playDemo(dm) {
+    stopDemo();
+    var tok = demoTok, t = 0;
+    if (dm.band) swing(dm.band, dm.bpm);
+    dm.steps.forEach(function (s) {
+      var at = t;
+      demoTimers.push(setTimeout(function () {
+        if (tok !== demoTok) return;
+        if (s.clear || !demoKeys) demoKeys = {};
+        s.notes.forEach(function (n, k) { demoKeys[n] = s.tags ? s.tags[k] : ""; });
+        if (s.caption) $("demoNote").textContent = s.caption.replace(/^\s+/, "");
+        paintKeys();
+      }, at * 1000 + (dm.band ? 80 : 0)));
+      if (!s.silent) s.notes.forEach(function (n) { tone(n, at, s.dur || 0.7, s.notes.length > 2 ? 0.09 : 0.14); });
+      t += s.gap;
+    });
+    demoTimers.push(setTimeout(function () {
+      if (tok !== demoTok) return;
+      demoKeys = null; paintKeys();
+      $("demoNote").textContent = DEMO_NOTE;
+    }, (t + 1.6) * 1000));
+  }
+
+  /* ---------- menus ---------- */
+  var OVERLAYS = ["menu", "settings", "free", "shop", "book", "lesson", "done", "over"];
+  function hideOverlays() { OVERLAYS.forEach(function (id) { $(id).hidden = true; }); }
+  function showOverlay(id) {
+    hideOverlays();
+    stopDemo();
+    if (id === "menu") buildMenu();
+    if (id === "shop") buildShop();
+    if (id === "book") buildBook();
+    if (id === "free") syncFree();
+    $(id).hidden = false;
+  }
+  // Sharps and flats get the music font; text inside tags (attributes) is left alone.
+  function acHTML(html) { return html.replace(/(<[^>]*>)|[♯♭]/g, function (m, tag) { return tag || '<span class="ac">' + m + '</span>'; }); }
+  function say(html) { $("msg").innerHTML = acHTML(html); }
+
+  var coinURL = null, lockURL = null;
+  function menuWorlds() { return CHAPTERS[save.chapter || 0].worlds; }
+  function buildMenu() {
+    if (!chapterOpen(save.chapter)) save.chapter = 0;
+    coinURL = coinURL || spriteURL("coin", null, "", 3);
+    lockURL = lockURL || spriteURL("lock", null, "", 3);
+    $("walletIcon").src = coinURL;
+    $("wallet").textContent = save.wallet;
+    var tabs = $("tabs");
+    tabs.innerHTML = "";
+    CHAPTERS.forEach(function (c, ci) {
+      var open = chapterOpen(ci), b = document.createElement("button");
+      b.type = "button"; b.className = "pbtn tab"; b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", ci === save.chapter ? "true" : "false");
+      b.disabled = !open;
+      b.innerHTML = (open ? "" : '<img alt="locked: " src="' + lockURL + '">') + c.roman + " &middot; " + c.tab;
+      b.addEventListener("click", function () {
+        sfx.click(); save.chapter = ci; persist();
+        menuWi = 0; menuWorld = c.worlds[0]; menuWorldT = 0; flashT = 0.2;
+        buildMenu();
+      });
+      tabs.appendChild(b);
+    });
+    var ch = CHAPTERS[save.chapter];
+    $("chapterSub").innerHTML = "<b>" + ch.title + "</b> &middot; " + ch.sub;
+    var starOn = spriteURL("star", null, "", 2), starOff = spriteURL("star", { y: "#333c57", k: "#566c86" }, "empty", 2);
+    var box = $("levels");
+    box.innerHTML = "";
+    LEVELS.forEach(function (L, i) {
+      if (L.ch !== save.chapter) return;
+      var spec = levelBoss(L).m, open = unlocked(i), got = save.stars[i] || 0;
+      var b = document.createElement("button");
+      b.className = "lvl"; b.type = "button"; b.disabled = !open;
+      var monImg = spriteURL(sprName(spec.kind), spec.pal, spec.name, 3);
+      b.innerHTML = '<span class="num">' + (i + 1) + '</span>' +
+        '<img class="mon" alt="" src="' + monImg + '">' +
+        (open ? "" : '<img class="lock" alt="" src="' + lockURL + '">') +
+        '<span>' + L.name + '</span>' +
+        '<span class="stars">' + [0, 1, 2].map(function (j) { return '<img alt="" src="' + (j < got ? starOn : starOff) + '">'; }).join("") + '</span>';
+      b.setAttribute("aria-label", "Level " + (i + 1) + ", " + L.name + (open ? ", " + got + " stars" : ", locked"));
+      b.addEventListener("click", function () { sfx.click(); startLevel(i); });
+      box.appendChild(b);
+    });
+  }
+  function buildShop() {
+    coinURL = coinURL || spriteURL("coin", null, "", 3);
+    $("walletIcon2").src = coinURL;
+    $("wallet2").textContent = save.wallet;
+    var box = $("robes");
+    box.innerHTML = "";
+    ROBES.forEach(function (r) {
+      var owned = save.owned.indexOf(r.id) >= 0, worn = save.robe === r.id;
+      var d = document.createElement("div");
+      d.className = "robe" + (worn ? " worn" : "");
+      var btn = document.createElement("button");
+      btn.type = "button"; btn.className = "pbtn sm" + (owned ? " alt" : "");
+      if (worn) { btn.textContent = "WEARING"; btn.disabled = true; }
+      else if (owned) btn.textContent = "WEAR";
+      else { btn.textContent = r.cost + " COINS"; btn.disabled = save.wallet < r.cost; }
+      btn.addEventListener("click", function () {
+        if (!owned) { if (save.wallet < r.cost) return; save.wallet -= r.cost; save.owned.push(r.id); sfx.buy(); }
+        else sfx.click();
+        save.robe = r.id; persist(); buildShop();
+      });
+      d.innerHTML = '<img alt="" src="' + spriteURL("hero", r.pal, "hero" + r.id, 4) + '"><span>' + r.name + '</span>';
+      d.appendChild(btn);
+      box.appendChild(d);
+    });
+  }
+
+  /* ---------- lessons, cheat sheets, notebook ---------- */
+  var pageGo = null, pageBack = null;
+  function lessonHTML(paras) {
+    return acHTML(paras.map(function (p) { return /^<(table|div)/.test(p) ? p : "<p>" + p + "</p>"; }).join(""));
+  }
+  function showPage(o) {
+    stopDemo();
+    $("lessonKicker").textContent = o.kicker;
+    $("lessonTitle").textContent = o.title;
+    $("lessonBody").innerHTML = o.html;
+    var box = $("lessonDemos");
+    box.innerHTML = "";
+    (o.demos || []).forEach(function (d) {
+      var dm = demoOf(d), b = document.createElement("button");
+      b.type = "button"; b.className = "pbtn sm sky";
+      b.innerHTML = acHTML("&#9654; " + dm.label);
+      b.addEventListener("click", function () { playDemo(demoOf(d)); });
+      box.appendChild(b);
+    });
+    [].forEach.call($("lessonBody").querySelectorAll("[data-demo]"), function (b) {
+      var d = JSON.parse(b.dataset.demo);
+      b.addEventListener("click", function () { playDemo(demoOf(d)); });
+    });
+    $("demoNote").hidden = !box.children.length && !$("lessonBody").querySelector("[data-demo]");
+    pageGo = o.go.fn; $("lessonGo").innerHTML = o.go.label;
+    pageBack = o.back ? o.back.fn : null;
+    $("lessonBack").hidden = !o.back;
+    if (o.back) $("lessonBack").textContent = o.back.label;
+    hideOverlays();
+    $("lesson").hidden = false;
+    $("lesson").scrollTop = 0;
+  }
+  function openLesson(i, from) {
+    var L = LEVELS[i], ch = CHAPTERS[L.ch];
+    if (from === "play") paused = true;
+    var go;
+    if (from === "play") go = { label: "BACK TO GAME &#9654;", fn: resumeFromLesson };
+    else if (from === "book") go = { label: "BACK", fn: function () { showOverlay("book"); } };
+    else go = { label: "PLAY &#9654;", fn: function () { save.seen[i] = true; persist(); beginLevel(i); } };
+    showPage({
+      kicker: "CHAPTER " + ch.roman + " · LEVEL " + (i + 1),
+      title: L.lesson.title, html: lessonHTML(L.lesson.body), demos: L.lesson.demos,
+      go: go, back: from === "start" ? { label: "MAP", fn: toMenu } : null
+    });
+    if (from === "play") say("Paused. Try the examples, then jump back in.");
+    else if (from === "start") say("Lesson time! Try the examples, then press <b>PLAY</b>.");
+  }
+  function resumeFromLesson() {
+    stopDemo();
+    hideOverlays();
+    paused = false;
+    if (run && cur && !locked) say(promptMsg(false));
+    else if (run) say("Back in the game!");
+  }
+  function demoBtn(d) { return "<button class='pbtn alt' type='button' data-demo='" + JSON.stringify(d) + "'>&#9654;</button>"; }
+  var SHEETS = [
+    function () {
+      var rows = INTERVALS.filter(function (v) { return v.semi > 0; }).map(function (v) {
+        return "<tr><th>" + v.id + "</th><td>" + v.name + "</td><td class=n>" + v.semi + "</td><td>C&rarr;" + nameN(up(note("C"), v.id)) + "</td><td>" + demoBtn(["iv", "C", [v.id]]) + "</td></tr>";
+      });
+      return { title: "INTERVALS", html: "<p>Half steps from the bottom note, and the note you land on from C.</p>" +
+        "<div style='overflow-x:auto'><table><tr><th></th><th>name</th><th>steps</th><th>from C</th><th></th></tr>" + rows.join("") + "</table></div>" +
+        "<p><b>Shortcuts:</b> M7 = octave minus a half step &middot; m7 = octave minus a whole step &middot; M3 + m3 = P5.</p>" };
+    },
+    function () {
+      var rows = ["maj", "min", "maj7", "dom7", "m7"].map(function (q) {
+        var c = chordOf("C", q);
+        return "<tr><th>" + (q === "maj" ? "C" : c.sym) + "</th><td>" + QUAL[q].name + "</td><td>" + QUAL[q].stack + "</td><td>" + toneNames(c) + "</td><td>" + demoBtn(["chord", "C", q]) + "</td></tr>";
+      });
+      return { title: "CHORDS", html: "<div style='overflow-x:auto'><table><tr><th></th><th>name</th><th>stack</th><th>in C</th><th></th></tr>" + rows.join("") + "</table></div>" +
+        "<p><b>maj7</b> = major triad + a half step below the root.<br><b>7</b> = major triad + a whole step below the root.<br><b>m7</b> = minor triad + a whole step below the root.</p>" +
+        "<p><b>Shell</b> = R 3 7 &middot; <b>guide tones</b> = 3 7.</p>" };
+    },
+    function () {
+      var rows = KEYS12.map(function (k) {
+        var p = progOf(k, "iiVI");
+        return "<tr><th>" + k + "</th><td>" + p[0].sym + "</td><td>" + p[1].sym + "</td><td>" + p[2].sym + "</td><td>" + demoBtn(["prog", k, "iiVI", "full"]) + "</td></tr>";
+      });
+      return { title: "ii-V-I IN ALL 12 KEYS", html: "<p>ii = whole step up, m7 &middot; V = P5 up, 7 &middot; I = the key, maj7.</p>" +
+        "<div style='overflow-x:auto'><table><tr><th>key</th><th>ii</th><th>V</th><th>I</th><th></th></tr>" + rows.join("") + "</table></div>" };
+    }
+  ];
+  function openSheet(ci) {
+    var s = SHEETS[ci]();
+    showPage({ kicker: "CHEAT SHEET · CHAPTER " + CHAPTERS[ci].roman, title: s.title, html: acHTML(s.html), demos: [],
+      go: { label: "BACK", fn: function () { showOverlay("book"); } }, back: null });
+  }
+  function buildBook() {
+    var box = $("bookList");
+    box.innerHTML = "";
+    CHAPTERS.forEach(function (c, ci) {
+      if (!chapterOpen(ci)) return;
+      var div = document.createElement("div"), chips = document.createElement("div");
+      div.innerHTML = '<p class="lab">' + c.roman + " &middot; " + c.title + "</p>";
+      chips.className = "chips";
+      LEVELS.forEach(function (L, i) {
+        if (L.ch !== ci || !unlocked(i)) return;
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "chip"; b.textContent = (i + 1) + ". " + L.name;
+        b.addEventListener("click", function () { sfx.click(); openLesson(i, "book"); });
+        chips.appendChild(b);
+      });
+      var sh = document.createElement("button");
+      sh.type = "button"; sh.className = "chip sheet"; sh.textContent = "Cheat sheet";
+      sh.addEventListener("click", function () { sfx.click(); openSheet(ci); });
+      chips.appendChild(sh);
+      div.appendChild(chips);
+      box.appendChild(div);
+    });
+  }
+  $("lessonGo").addEventListener("click", function () { sfx.click(); if (pageGo) pageGo(); });
+  $("lessonBack").addEventListener("click", function () { sfx.click(); if (pageBack) pageBack(); });
+
+  /* ---------- settings & practice ---------- */
+  function chipGroup(id, get, set) {
+    var els = $(id).querySelectorAll("[data-v]");
+    function sync() { [].forEach.call(els, function (e) { e.setAttribute("aria-pressed", e.dataset.v === get() ? "true" : "false"); }); }
+    [].forEach.call(els, function (e) {
+      e.addEventListener("click", function () { set(e.dataset.v); sync(); persist(); sfx.click(); });
+    });
+    sync();
+  }
+  // Several-of chips: one has to stay on.
+  function multiGroup(id, list) {
+    [].forEach.call($(id).querySelectorAll("[data-m]"), function (e) {
+      var v = e.dataset.m;
+      e.setAttribute("aria-pressed", list.indexOf(v) >= 0 ? "true" : "false");
+      e.addEventListener("click", function () {
+        var on = list.indexOf(v) >= 0;
+        if (on && list.length === 1) return;
+        if (on) list.splice(list.indexOf(v), 1); else list.push(v);
+        e.setAttribute("aria-pressed", on ? "false" : "true");
+        persist(); sfx.click();
+      });
+    });
+  }
+  chipGroup("speedChips", function () { return save.speed; }, function (v) { save.speed = v; });
+  chipGroup("paceChips", function () { return String(save.pace); }, function (v) { save.pace = parseInt(v, 10); });
+  chipGroup("labelChips", function () { return save.labels; }, function (v) { save.labels = v; drawKeys(); });
+  chipGroup("sfxChips", function () { return save.sfx ? "on" : "off"; }, function (v) { save.sfx = v === "on"; });
+  chipGroup("bandChips", function () { return save.band ? "on" : "off"; }, function (v) { save.band = v === "on"; });
+  chipGroup("unlockChips", function () { return save.unlockAll ? "on" : "off"; }, function (v) { save.unlockAll = v === "on"; });
+
+  $("ivChips").innerHTML = ["m2","M2","m3","M3","P4","TT","P5","m6","M6","m7","M7","P8"].map(function (id) {
+    return '<button class="chip" data-m="' + id + '" type="button" title="' + IV[id].name + '">' + id + '<span style="opacity:.6"> ' + IV[id].semi + '</span></button>';
+  }).join("");
+  multiGroup("ivChips", save.free.ivs);
+  multiGroup("qualChips", save.free.quals);
+  function syncFree() {
+    [].forEach.call($("free").querySelectorAll("[data-for]"), function (el) {
+      el.hidden = el.dataset.for.split(" ").indexOf(save.free.mode) < 0;
+    });
+  }
+  chipGroup("modeChips", function () { return save.free.mode; }, function (v) { save.free.mode = v; syncFree(); });
+  chipGroup("pidChips", function () { return save.free.pid; }, function (v) { save.free.pid = v; });
+  chipGroup("keyChips", function () { return save.free.keys; }, function (v) { save.free.keys = v; });
+  chipGroup("voiceChips", function () { return save.free.voicing; }, function (v) { save.free.voicing = v; });
+  chipGroup("namesChips", function () { return save.free.names; }, function (v) { save.free.names = v; });
+
+  $("freeBtn").addEventListener("click", function () { sfx.click(); showOverlay("free"); });
+  $("bookBtn").addEventListener("click", function () { sfx.click(); showOverlay("book"); });
+  $("shopBtn").addEventListener("click", function () { sfx.click(); showOverlay("shop"); });
+  $("setBtn").addEventListener("click", function () { sfx.click(); disarmReset(); showOverlay("settings"); });
+
+  // Two taps, so a stray click can't wipe your stars.
+  var resetArmed = false;
+  function disarmReset() {
+    resetArmed = false;
+    $("resetBtn").textContent = "RESET PROGRESS";
+    $("resetNote").textContent = "Clears stars, coins and robes. Settings stay.";
+  }
+  $("resetBtn").addEventListener("click", function () {
+    if (!resetArmed) {
+      resetArmed = true;
+      $("resetBtn").textContent = "SURE? TAP AGAIN";
+      $("resetNote").textContent = "This can't be undone.";
+      sfx.click();
+      return;
+    }
+    save.stars = {}; save.wallet = 0; save.owned = ["blue"]; save.robe = "blue"; save.seen = {}; save.chapter = 0;
+    persist();
+    sfx.lose();
+    resetArmed = false;
+    $("resetBtn").textContent = "RESET PROGRESS";
+    $("resetNote").textContent = "Progress cleared. Back to level 1!";
+  });
+  $("freeGo").addEventListener("click", function () { sfx.click(); startFree(); });
+  [].forEach.call(document.querySelectorAll("[data-close]"), function (b) {
+    b.addEventListener("click", function () { sfx.click(); showOverlay("menu"); });
+  });
+  [].forEach.call(document.querySelectorAll("[data-map]"), function (b) {
+    b.addEventListener("click", function () { sfx.click(); toMenu(); });
+  });
+  $("nextLvl").addEventListener("click", function () { sfx.click(); startLevel(Math.min(LEVELS.length - 1, run.cfg.level + 1)); });
+  $("replay").addEventListener("click", function () { sfx.click(); beginLevel(run.cfg.level); });
+  $("retryLvl").addEventListener("click", function () {
+    sfx.click();
+    if (run.cfg.level >= 0) beginLevel(run.cfg.level); else startFree();
+  });
+  $("overLesson").addEventListener("click", function () { sfx.click(); openLesson(run.cfg.level, "start"); });
+  $("mapBtn").addEventListener("click", function () { sfx.click(); toMenu(); });
+  $("nextBtn").addEventListener("click", retryNow);
+  $("lessonBtn").addEventListener("click", function () {
+    if (!run || run.cfg.level < 0 || mode !== "play") return;
+    sfx.click();
+    openLesson(run.cfg.level, "play");
+  });
+  $("hintBtn").addEventListener("click", function () {
+    if (!run || !cur || locked || revealed || paused) return;
+    revealed = true; run.hinted = true; cur.showSym = true;
+    paintKeys();
+    if (cur.kind === "int") {
+      tone(cur.rootMidi, 0.02, 0.5); tone(cur.ansMidi, 0.4, 0.9);
+      say("Count along: the numbers on the keys are the half steps. (No coins for this one.)");
+    } else {
+      chordTone(revealNotes(), 0.02, 1.2);
+      say("<b>" + chordLabel(cur) + "</b> = " + needTones(cur).map(function (t) { return t.name; }).join(" ") + " &mdash; play the glowing keys. (No coins this time.)");
+    }
+  });
+  $("skipBtn").addEventListener("click", function () {
+    if (!run || !cur || locked) return;
+    var m = run.monster;
+    if (m && !m.boss) {
+      locked = true; m.state = "die"; cur = null; paintKeys();
+      burst(m.x, monCenterY(m), ["#94b0c2", "#f4f4f4"], 12, 60);
+      later(0.25, function () { spawnMonster(false); });
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === " " || e.key === "Enter") {
+      if (e.target.tagName === "BUTTON" || e.target.tagName === "SELECT") return;
+      if (run && verdict === "wrong" && locked && mode === "play") { e.preventDefault(); retryNow(); }
+    }
+  });
+
+  function syncSound() { $("soundBtn").setAttribute("aria-pressed", save.sound ? "true" : "false"); }
+  $("soundBtn").addEventListener("click", function () { save.sound = !save.sound; syncSound(); persist(); });
+  syncSound();
+
+  var fsBtn = $("fs"), docEl = document.documentElement;
+  var goFs = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+  var endFs = document.exitFullscreen || document.webkitExitFullscreen;
+  function fsOn() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function syncFs() { fsBtn.textContent = fsOn() ? "EXIT" : "FULL"; }
+  if (goFs) {
+    fsBtn.hidden = false;
+    fsBtn.addEventListener("click", function () {
+      try { if (fsOn()) { endFs.call(document); } else { var r = goFs.call(docEl); if (r && r.catch) r.catch(function () {}); } }
+      catch (e) { /* refused by the browser — leave the button as it was */ }
+    });
+    document.addEventListener("fullscreenchange", syncFs);
+    document.addEventListener("webkitfullscreenchange", syncFs);
+  }
+
+  if (/[?&]test\b/.test(location.search)) {
+    window.JQ = {
+      press: press, release: release, startLevel: startLevel, beginLevel: beginLevel, startFree: startFree,
+      toMenu: toMenu, openLesson: openLesson, openSheet: openSheet, showOverlay: showOverlay, playDemo: playDemo, demoOf: demoOf,
+      save: save, LEVELS: LEVELS, chordOf: chordOf, progOf: progOf, up: up, note: note, nameN: nameN,
+      state: function () { return { mode: mode, cur: cur, locked: locked, verdict: verdict, run: run, paused: paused }; }
+    };
+  }
+
+  /* ---------- go ---------- */
+  var last = now();
+  function frame(t) {
+    var dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
+    last = t;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+  menuWorld = menuWorlds()[0];
+  drawKeys();
+  showOverlay("menu");
+  requestAnimationFrame(frame);
+})();
+</script>
