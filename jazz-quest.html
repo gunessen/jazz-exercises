@@ -355,6 +355,7 @@
             <div class="chips" id="keyChips">
               <button class="chip" data-v="easy" type="button">A few easy ones</button>
               <button class="chip" data-v="all" type="button">All 12</button>
+              <button class="chip" data-v="climb" type="button">Climb: start easy, notch up<span class="nb" data-new="climb">NEW</span></button>
             </div></div>
           <div data-for="chord prog"><p class="lab">Notes to play</p>
             <div class="chips" id="voiceChips">
@@ -450,7 +451,7 @@
     <p class="msg" id="msg" aria-live="polite">Pick a level to start your quest!</p>
     <div class="actions" id="actions" hidden>
       <button class="pbtn sm go" id="nextBtn" type="button" hidden>NEXT &#9654;</button>
-      <button class="pbtn sm alt tog" id="hintBtn" type="button" aria-pressed="false" title="Show the answer on every question (no coins while on)">HINT</button>
+      <button class="pbtn sm alt tog" id="hintBtn" type="button" aria-pressed="false" title="Show or hide the answers (no coins for a shown answer)">HINT</button>
       <button class="pbtn sm sky" id="lessonBtn" type="button">LESSON</button>
       <button class="pbtn sm alt" id="skipBtn" type="button" hidden>SKIP</button>
       <button class="pbtn sm alt" id="pauseBtn" type="button">PAUSE</button>
@@ -555,6 +556,7 @@
     dflt: ["C","D♭","D","E♭","E","F","F♯","G","A♭","A","B♭","B"]
   };
   var FOURTHS = ["C","F","B♭","E♭","A♭","D♭","G♭","B","E","A","D","G"];
+  var BLACK_ROOTS = ["D♭","E♭","F♯","A♭","B♭"];       // respell() picks the cleaner name per interval
   function isBlack(pc) { return [1, 3, 6, 8, 10].indexOf(pcOf(pc)) >= 0; }
   // A black-key root takes whichever name keeps every answer a plain letter
   // step away: D♭ + m7 would be C♭, so it is asked as C♯ + m7 = B.
@@ -699,7 +701,8 @@
     save.v = 3;
   }
   // What's new in this version: a badge each until it's opened.
-  var NEWS = ["lvl:happy", "lvl:sevenths", "lvl:gt37", "lvl:fifths", "lvl:sixths", "practice", "settings"];
+  var NEWS = ["lvl:happy", "lvl:sevenths", "lvl:gt37", "lvl:fifths", "lvl:sixths", "practice", "settings", "climb",
+    "lvl:mix", "lvl:triads", "lvl:maj7", "lvl:dom7", "lvl:m7", "lvl:roots12", "lvl:anykey", "lvl:keys12"];
   if (!save.news || typeof save.news !== "object") save.news = {};
   function isNew(k) { return NEWS.indexOf(k) >= 0 && !save.news[k]; }
   function seenNew(k) { if (isNew(k)) { save.news[k] = true; persist(); } }
@@ -1458,14 +1461,19 @@
         "Black keys have two names. The key just above C is <b>C♯</b> (C sharp), and it's also <b>D♭</b> (D flat).",
         "This is the <b>only counting</b> you'll do. From here on you find intervals by how the keys look &mdash; counting is too slow for jazz."],
         demos:[["count","C",1],["count","E",1],["count","B",1],["count","C",2],["count","E",2]] } },
-    { id:"happy", ch:0, name:"Happy Thirds", world:1, count:10, bossHp:5, hint:"the three happy thirds",
-      gen:{ type:"int", pairs:[["C","M3"],["F","M3"],["G","M3"],["D","m3"],["E","m3"],["A","m3"],["B","m3"]], wheels:true, shapes:true },
+    { id:"happy", ch:0, name:"Happy Thirds", world:1, count:10, bossHp:6, hint:"happy thirds, then the tricky ones",
+      gen:{ type:"int", wheels:true, shapes:true, tiers:[
+        { name:"white thirds", pairs:[["C","M3"],["F","M3"],["G","M3"],["D","m3"],["E","m3"],["A","m3"],["B","m3"]], n:5 },
+        { name:"flip the top", pairs:[["C","m3"],["F","m3"],["G","m3"],["D","M3"],["E","M3"],["A","M3"],["B","M3"]], n:5 },
+        { name:"black-key roots", roots:BLACK_ROOTS, ivs:["M3","m3"], n:5 },
+        { name:"all 12, no help", roots:KEYS12, ivs:["M3","m3"], wheels:false, n:5 }] },
       lesson:{ title:"THE THREE HAPPY THIRDS", body:[
         "A <b>3rd</b> skips one white key: C&rarr;E, D&rarr;F, A&rarr;C. It comes in two sizes: <b>M3</b> (major, bright) and <b>m3</b> (minor, dark).",
         "Don't count keys. Remember the <b>three happy thirds</b>, the only major 3rds that are white to white:",
         "<table><tr><th>C&ndash;E</th><th>F&ndash;A</th><th>G&ndash;B</th></tr><tr><td>major</td><td>major</td><td>major</td></tr></table>",
         "Every other white-key third &mdash; <b>D&ndash;F, E&ndash;G, A&ndash;C, B&ndash;D</b> &mdash; is <b>minor</b>.",
-        "Strike both keys <b>together</b> with thumb and middle finger (<b>1+3</b>). Your hand learns the stretch faster than your eyes learn a count."],
+        "Strike both keys <b>together</b> with thumb and middle finger (<b>1+3</b>). Your hand learns the stretch faster than your eyes learn a count.",
+        "The land gets harder as you go: <b>white thirds</b> &rarr; <b>flip the top</b> (C&ndash;E♭, D&ndash;F♯) &rarr; <b>black-key roots</b> &rarr; <b>all 12, no help</b>. Clean answers take you up a notch; a miss takes you back down one."],
         demos:[["iv","C",["M3"]],["iv","F",["M3"]],["iv","G",["M3"]],["iv","D",["m3"]],["iv","A",["m3"]]] } },
     { id:"ladM3", ch:0, name:"M3 Ladder", world:1, count:12, bossHp:5, hint:"M3 from every key",
       boss:{ m:MON.goblin, name:"Major Goblin", scale:3 },
@@ -1497,7 +1505,11 @@
         "This is the exact move between a major and a minor chord, so it pays off in Chapter II."],
         demos:[["iv","C",["M3"]],["iv","C",["m3"]],["iv","A",["M3"]],["iv","A",["m3"]]] } },
     { id:"sevenths", ch:0, name:"Octave Down", world:4, count:24, bossHp:6, hint:"7ths: octave, then step down",
-      gen:{ type:"int", ivs:["M7","m7"], ladder:true, wheels:true },
+      gen:{ type:"int", wheels:true, tiers:[
+        { name:"M7 from white keys", roots:NATURALS, ivs:["M7"] },
+        { name:"m7 from white keys", roots:NATURALS, ivs:["m7"] },
+        { name:"black-key roots", roots:BLACK_ROOTS, ivs:["M7","m7"] },
+        { name:"all 12, no help", roots:KEYS12, ivs:["M7","m7"], wheels:false, n:5 }] },
       lesson:{ title:"SEVENTHS: THINK DOWN", body:[
         "<b>P8</b> &middot; the octave: the same note, one floor up. Thumb and pinky (<b>1+5</b>).",
         "Never count up to a 7th. Find the octave, then step <b>back down</b>:",
@@ -1508,7 +1520,10 @@
         demos:[["iv","C",["P8"]],["iv","C",["M7"]],["iv","C",["m7"]],["iv","E♭",["M7"]],["iv","G",["m7"]]] } },
     { id:"gt37", ch:0, name:"Guide-Tone Drill", world:2, count:12, bossHp:6, hint:"3rds & 7ths, all 12 keys",
       boss:{ m:MON.ghost, name:"The Guide Ghost", scale:3 },
-      gen:{ type:"int", ivs:["m3","M3","m7","M7"], roots:KEYS12, wheels:false },
+      gen:{ type:"int", wheels:false, tiers:[
+        { name:"3rds, all 12", roots:KEYS12, ivs:["m3","M3"] },
+        { name:"7ths, all 12", roots:KEYS12, ivs:["m7","M7"] },
+        { name:"3rds & 7ths mixed", roots:KEYS12, ivs:["m3","M3","m7","M7"], n:6 }] },
       lesson:{ title:"GUIDE-TONE DRILL", body:[
         "Drill <b>only 3rds and 7ths</b>, in all 12 keys, until they're automatic. Once they are, 4ths, 5ths and 6ths fall into place.",
         "<table><tr><th>3rds</th><td>the white-key third, then fix the accidentals</td></tr>" +
@@ -1517,7 +1532,12 @@
         "These are exactly the notes you'll play as guide tones in Chapter III."],
         demos:[["iv","D♭",["M3"]],["iv","F♯",["m3"]],["iv","A♭",["M7"]],["iv","B",["m7"]]] } },
     { id:"fifths", ch:0, name:"Same Colour", world:3, count:24, bossHp:6, hint:"5ths & 4ths keep the colour",
-      gen:{ type:"int", ivs:["P5","P4"], ladder:true, wheels:true },
+      gen:{ type:"int", wheels:true, tiers:[
+        { name:"white keys", pairs:[["C","P5"],["D","P5"],["E","P5"],["F","P5"],["G","P5"],["A","P5"],
+          ["C","P4"],["D","P4"],["E","P4"],["G","P4"],["A","P4"],["B","P4"]] },
+        { name:"black keys", pairs:[["D♭","P5"],["E♭","P5"],["F♯","P5"],["A♭","P5"],["D♭","P4"],["E♭","P4"],["A♭","P4"],["B♭","P4"]] },
+        { name:"the B/F exceptions", pairs:[["B","P5"],["B♭","P5"],["F","P4"],["F♯","P4"]] },
+        { name:"all 12, no help", roots:KEYS12, ivs:["P5","P4"], wheels:false, n:5 }] },
       lesson:{ title:"SAME COLOUR: 5THS & 4THS", body:[
         "<b>P5</b> &middot; perfect 5th: strong and open, the backbone of every chord. <b>P4</b> &middot; perfect 4th: the 5th turned upside down.",
         "The rule: <b>a 4th or 5th has the same colour as its root</b>. White to white: C&ndash;G, D&ndash;A, E&ndash;B, G&ndash;D. Black to black: D♭&ndash;A♭, E♭&ndash;B♭, F♯&ndash;C♯.",
@@ -1527,7 +1547,10 @@
         demos:[["iv","C",["P5"]],["iv","E♭",["P5"]],["iv","B",["P5"]],["iv","F",["P4"]],["iv","F♯",["P4"]]] } },
     { id:"sixths", ch:0, name:"Sixths", world:4, count:12, bossHp:5, hint:"M6: octave, down a m3",
       boss:{ m:MON.shroom, name:"Six-Cap", scale:3 },
-      gen:{ type:"int", ivs:["M6"], ladder:true, wheels:true },
+      gen:{ type:"int", wheels:true, tiers:[
+        { name:"white keys", roots:NATURALS, ivs:["M6"] },
+        { name:"black keys", roots:BLACK_ROOTS, ivs:["M6"] },
+        { name:"all 12, no help", roots:KEYS12, ivs:["M6"], wheels:false, n:5 }] },
       lesson:{ title:"SIXTHS", body:[
         "<b>M6</b> &middot; major 6th. Two ways to find it, neither one counts:",
         "<table><tr><th>from the top</th><td>octave, down a <b>minor 3rd</b></td></tr>" +
@@ -1536,9 +1559,12 @@
         "The 6th is a jazz favourite: C6 is C E G A. Fingers <b>1+4 or 1+5</b>."],
         demos:[["iv","C",["M6"]],["iv","F",["M6"]],["iv","E♭",["M6"]],["iv","A",["M6"]]] } },
     { id:"mix", ch:0, name:"The Big Mix", world:5, count:12, bossHp:6, hint:"everything, no help",
-      gen:{ type:"int", ivs:["M2","m3","M3","P4","P5","M6","m7","M7"],
-        stacks:[["M3","m3","M3"],["M3","m3","m3"],["m3","M3","m3"],["M3","m3"]], stackP:0.3,
-        roots:KEYS12, wheels:false },
+      gen:{ type:"int", wheels:false, tiers:[
+        { name:"3rds, 5ths, 7ths", roots:NATURALS, ivs:["m3","M3","P5","m7","M7"] },
+        { name:"every interval", roots:NATURALS.concat(["B♭","E♭"]), ivs:["M2","m3","M3","P4","P5","M6","m7","M7"] },
+        { name:"all 12 roots", roots:KEYS12, ivs:["M2","m3","M3","P4","P5","M6","m7","M7"] },
+        { name:"stacks too", roots:KEYS12, ivs:["M2","m3","M3","P4","P5","M6","m7","M7"],
+          stacks:[["M3","m3","M3"],["M3","m3","m3"],["m3","M3","m3"],["M3","m3"]], stackP:0.35, n:5 }] },
       lesson:{ title:"THE BIG MIX", body:[
         "Everything so far, any root, no help on the sign.",
         "<table><tr><th>3rds</th><td>happy thirds, then fix the accidentals</td></tr><tr><th>4ths, 5ths</th><td>same colour (watch B and F)</td></tr>" +
@@ -1548,7 +1574,9 @@
 
     { id:"triads", ch:1, name:"Triads", world:7, count:8, bossHp:4, hint:"major and minor triads",
       boss:{ m:MON.gnote, name:"Major Minor", scale:3 },
-      gen:{ type:"chord", quals:["maj","min"], roots:["C","D","E","F","G","A"], voicing:"full", wheels:true },
+      gen:{ type:"chord", quals:["maj","min"], voicing:"full", wheels:true, tiers:[
+        { name:"white-key triads", pairs:[["C","maj"],["F","maj"],["G","maj"],["D","min"],["E","min"],["A","min"]] },
+        { name:"any of six roots", roots:["C","D","E","F","G","A"], n:4 }] },
       lesson:{ title:"STACK THIRDS: TRIADS", body:[
         "A <b>chord</b> is three or more notes played together. Jazz builds chords by <b>stacking thirds</b>.",
         "<b>Major triad</b>, written <b>C</b> = root + M3 + m3 &rarr; C E G. Bright.",
@@ -1558,7 +1586,8 @@
         demos:[["chord","C","maj"],["chord","C","min"],["chord","D","min"],["chord","A","maj"]] } },
     { id:"maj7", ch:1, name:"Major 7", world:7, count:8, bossHp:4, hint:"maj7 chords",
       boss:{ m:MON.gnote, name:"Sir Major Seven", scale:3 },
-      gen:{ type:"chord", quals:["maj7"], roots:EASY_ROOTS, voicing:"full", wheels:true },
+      gen:{ type:"chord", quals:["maj7"], voicing:"full", wheels:true, tiers:[
+        { name:"roots C F G", roots:["C","F","G"] }, { name:"plus D B♭ E♭", roots:EASY_ROOTS, n:4 }] },
       lesson:{ title:"MAJOR 7", body:[
         "Stack one more third and you get a <b>7th chord</b>: the sound of jazz.",
         "<b>Cmaj7</b> = C E G B &nbsp;&middot;&nbsp; root + M3 + m3 + M3 &nbsp;&middot;&nbsp; notes 1 3 5 7",
@@ -1567,7 +1596,8 @@
         demos:[["chord","C","maj7"],["chord","F","maj7"],["chord","G","maj7"],["chord","D","maj7"]] } },
     { id:"dom7", ch:1, name:"Dominant 7", world:8, count:8, bossHp:4, hint:"7 chords",
       boss:{ m:MON.goon, name:"The Dominator", scale:3 }, mons:[MON.nghost, MON.note],
-      gen:{ type:"chord", quals:["dom7"], roots:["C","F","G","D","B♭","A"], voicing:"full", wheels:true },
+      gen:{ type:"chord", quals:["dom7"], voicing:"full", wheels:true, tiers:[
+        { name:"roots C F G", roots:["C","F","G"] }, { name:"plus D B♭ A", roots:["C","F","G","D","B♭","A"], n:4 }] },
       lesson:{ title:"DOMINANT 7", body:[
         "<b>C7</b> = C E G B♭ &nbsp;&middot;&nbsp; root + M3 + m3 + m3",
         "Shortcut: <b>major triad + the note a whole step below the root</b> (C&rarr;B♭).",
@@ -1575,7 +1605,8 @@
         "Sound: bluesy and restless &mdash; it <b>wants to move</b>. Its 3rd and 7th (E and B♭) are a <b>tritone</b> apart, 6 half steps. That rub is the tension."],
         demos:[["chord","C","dom7"],["chord","F","dom7"],["chord","G","dom7"],["chord","B♭","dom7"]] } },
     { id:"m7", ch:1, name:"Minor 7", world:8, count:8, bossHp:4, hint:"m7 chords",
-      gen:{ type:"chord", quals:["m7"], roots:["D","G","A","E","C","F"], voicing:"full", wheels:true },
+      gen:{ type:"chord", quals:["m7"], voicing:"full", wheels:true, tiers:[
+        { name:"roots D E A", roots:["D","E","A"] }, { name:"plus G C F", roots:["D","G","A","E","C","F"], n:4 }] },
       lesson:{ title:"MINOR 7", body:[
         "<b>Cm7</b> = C E♭ G B♭ &nbsp;&middot;&nbsp; root + m3 + M3 + m3",
         "Shortcut: <b>minor triad + the note a whole step below the root</b>.",
@@ -1594,7 +1625,9 @@
         demos:[["shift","C"],["shift","F"],["shift","D"]] } },
     { id:"roots12", ch:1, name:"All Twelve Roots", world:9, count:10, bossHp:6, hint:"all three, any root",
       boss:{ m:MON.bcat, name:"The Sphinx Cat", scale:3 }, mons:[MON.pnote, MON.note],
-      gen:{ type:"chord", quals:["maj7","dom7","m7"], roots:null, voicing:"full", wheels:false },
+      gen:{ type:"chord", quals:["maj7","dom7","m7"], voicing:"full", wheels:false, tiers:[
+        { name:"white-key roots", roots:NATURALS }, { name:"flat roots", roots:["F","B♭","E♭","A♭","D♭"] },
+        { name:"all 12 roots", roots:null, n:4 }] },
       lesson:{ title:"ALL TWELVE ROOTS", body:[
         "Any root, any of the big three. No formulas on the sign now.",
         "<table><tr><th>maj7</th><td>major triad</td><td>+ a half step below the root</td></tr>" +
@@ -1615,7 +1648,8 @@
         demos:[["scale","C"],["prog","C","iiVI","full"],["prog","F","iiVI","full"]] } },
     { id:"anykey", ch:2, name:"Any Key", world:10, count:4, hint:"names hidden",
       boss:{ m:MON.lisk, name:"Count Basilisk", scale:2 }, mons:[MON.cat, MON.note],
-      gen:{ type:"prog", pid:"iiVI", keys:["C","F","B♭","G","D","E♭"], voicing:"full", names:false }, bossKeys:["B♭","E♭"],
+      gen:{ type:"prog", pid:"iiVI", voicing:"full", names:false, tiers:[
+        { name:"keys C F G", keys:["C","F","G"] }, { name:"plus B♭ D E♭", keys:["C","F","B♭","G","D","E♭"] }] }, bossKeys:["B♭","E♭"],
       lesson:{ title:"ii-V-I IN ANY KEY", body:[
         "No need to write out the scale. Count from the key's root, the <b>I</b>:",
         "<table><tr><th>ii</th><td>a whole step up (M2)</td><td>minor 7</td></tr>" +
@@ -1654,7 +1688,8 @@
         demos:[["prog","C","turn","shell"],["prog","F","turn","shell"]] } },
     { id:"keys12", ch:2, name:"All Twelve Keys", world:12, count:5, hint:"the final gig",
       mons:[MON.tcat, MON.cat, MON.gnote],
-      gen:{ type:"prog", pid:"iiVI", keys:KEYS12, voicing:"shell", names:false }, bossKeys:["D","C","B♭"],
+      gen:{ type:"prog", pid:"iiVI", voicing:"shell", names:false, tiers:[
+        { name:"six easy keys", keys:["C","F","B♭","G","E♭","D"] }, { name:"all 12 keys", keys:KEYS12, n:9 }] }, bossKeys:["D","C","B♭"],
       lesson:{ title:"ALL TWELVE KEYS", body:[
         "The final gig: ii&ndash;V&ndash;I in any of the 12 keys, chord names hidden. Shells are enough (R 3 7).",
         "<b>ii</b> = whole step up, m7 &nbsp;&middot;&nbsp; <b>V</b> = P5 up, 7 &nbsp;&middot;&nbsp; <b>I</b> = the key, maj7",
@@ -1987,7 +2022,7 @@
 
   /* ---------- game state ---------- */
   var mode = "menu";                 // menu | play | end
-  var run = null, paused = false, hintOn = false, pausedMsg = "";
+  var run = null, paused = false, hintMode = "auto", pausedMsg = "";
   var cur = null, locked = true, verdict = null, revealed = false, answer = null;
   var held = {};
   var clock = 0, scroll = 0, travel = 0;
@@ -2305,10 +2340,12 @@
       rect(bx, 13, Math.round(bw * m.hp / m.maxHp), 2, "#b13e53");
     } else if (cfg.level >= 0) {
       text(caps(cfg.name), W / 2, 3, 8, "#f4f4f4", "center");
-      var pw = 90, px = W / 2 - pw / 2, k = Math.min(1, run.kills / cfg.count);
+      var pw = 90, px = W / 2 - pw / 2, nt = tiered() ? cfg.gen.tiers.length : 0;
+      var k = nt ? (run.topClear ? 1 : (run.tier + Math.min(1, run.climb / climbNeed())) / nt) : Math.min(1, run.kills / cfg.count);
       rect(px - 1, 12, pw + 2, 4, "#1a1c2c");
       rect(px, 13, pw, 2, "#333c57");
       rect(px, 13, Math.round(pw * k), 2, "#a7f070");
+      for (i = 1; i < nt; i++) rect(px + Math.round(pw * i / nt), 12, 1, 4, "#1a1c2c");   // one segment per tier
       blit(sprite("crown"), px + pw + 3, 11, 1);
     } else {
       var accu = st.asked ? Math.round(100 * st.right / st.asked) + "%" : "--";
@@ -2318,8 +2355,9 @@
     if (st.streak >= 3 && cfg.level >= 0) {
       var cols = ["#ffcd75", "#ef7d57", "#a7f070", "#73eff7"];
       text("COMBO " + st.streak + (st.streak >= 10 ? "  x3" : st.streak >= 5 ? "  x2" : ""), 5, 22, 8, cols[Math.floor(clock * 8) % 4], "left", true);
-    } else if (cfg.level < 0 && st.best) {
-      text("BEST " + st.best, 5, 22, 8, "#94b0c2", "left", true);
+    } else if (cfg.level < 0 && (st.best || tiered())) {
+      var tl = tiered() ? "TIER " + (run.tier + 1) + "/" + cfg.gen.tiers.length : "";
+      text(st.best ? "BEST " + st.best + (tl ? "  " + tl : "") : tl, 5, 22, 8, "#94b0c2", "left", true);
     }
     if (paused) text("PAUSED", W / 2, 120, 8, "#f4f4f4", "center", true);
   }
@@ -2531,10 +2569,11 @@
       cfg: cfg, world: cfg.world, hearts: cfg.hearts, maxHearts: cfg.hearts,
       kills: 0, total: 0, bossSpawned: false, stats: newStats(), coins: 0,
       timers: [], monster: null, lastKey: null, again: false, hinted: false, paceEnd: 0, paceDur: 0, graceUntil: 0, gracePcs: [],
-      lad: cfg.gen.ladder ? ladderSeq(cfg.gen) : null, ladI: 0
+      lad: cfg.gen.ladder ? ladderSeq(cfg.gen) : null, ladI: 0,
+      tier: 0, climb: 0, topClear: false, notch: ""
     };
     if (run.lad && cfg.level >= 0) cfg.count = run.lad.length;
-    hintOn = false; syncHint();
+    hintMode = "auto"; syncHint();
     mode = "play"; cur = null; locked = true; verdict = null; revealed = false; answer = null;
     parts = []; floats = []; bolts = []; coinsFly = [];
     hideOverlays();
@@ -2544,7 +2583,8 @@
     $("nextBtn").hidden = true;
     banner = { text: cfg.level >= 0 ? "LEVEL " + (cfg.level + 1) : "PRACTICE", sub: cfg.level >= 0 ? caps(cfg.name) : "", t: 0, dur: 1.5 };
     paintKeys();
-    say(cfg.level >= 0 ? "Get ready! In this land: <b>" + LEVELS[cfg.level].hint + "</b>." : "Get ready!");
+    var climbs = tiered() ? " Start easy with <b>" + cfg.gen.tiers[0].name + "</b>: clean answers take you up a notch, a miss takes you down one." : "";
+    say((cfg.level >= 0 ? "Get ready! In this land: <b>" + LEVELS[cfg.level].hint + "</b>." : "Get ready!") + climbs);
     travel = 0.9;
     later(1.0, function () { spawnMonster(false); });
   }
@@ -2559,6 +2599,13 @@
     if (!save.seen[LEVELS[i].id]) openLesson(i, "start");
     else beginLevel(i);
   }
+  // Practice's "Climb" option: white roots first, then a few flats, then all 12.
+  var PRACTICE_TIERS = {
+    int:   [{ name: "white-key roots", roots: NATURALS }, { name: "plus B♭ E♭ F♯", roots: NATURALS.concat(["B♭", "E♭", "F♯"]) },
+            { name: "all 12 roots", roots: KEYS12 }],
+    chord: [{ name: "roots C F G", roots: ["C", "F", "G"] }, { name: "a few easy roots", roots: EASY_ROOTS }, { name: "all 12 roots", roots: null }],
+    prog:  [{ name: "keys C F G", keys: ["C", "F", "G"] }, { name: "plus B♭ E♭ D", keys: ["C", "F", "B♭", "G", "E♭", "D"] }, { name: "all 12 keys", keys: KEYS12 }]
+  };
   function startFree() {
     var f = save.free, gen, worlds, count = 10;
     var easy = f.keys === "easy";
@@ -2573,6 +2620,7 @@
       worlds = CHAPTERS[2].worlds; count = 4;
     }
     gen.ladder = f.order === "ladder";
+    if (f.keys === "climb") gen.tiers = PRACTICE_TIERS[f.mode];
     beginRun({ level: -1, name: "Practice", world: worlds[0], worlds: worlds, gen: gen, count: count, bossHp: 3, hearts: 0 });
   }
   function toMenu() {
@@ -2693,10 +2741,62 @@
       s = wpick(c, function (x) { return mkInt(nameN(note(x[0])), x[1], false); });
       return intOf(s[0], s[1], false, gen.wheels, gen.shapes);
     }
-    gen.quals.forEach(function (q) { (gen.roots || ROOTS[q]).forEach(function (r) { c.push([r, q]); }); });
+    if (gen.pairs) c = gen.pairs.slice();
+    else gen.quals.forEach(function (q) { chartRoots(gen.roots, q).forEach(function (r) { c.push([r, q]); }); });
     s = wpick(c, function (x) { return mkChord(nameN(note(x[0])) + QUAL[x[1]].sym, gen.voicing); });
     return chordPrompt(s[0], s[1], gen.voicing, gen.wheels);
   }
+  // A list of roots, each renamed the way ROOTS[q] spells that key (D♭m7 -> C♯m7).
+  function chartRoots(roots, q) {
+    if (!roots) return ROOTS[q];
+    var out = [];
+    roots.forEach(function (r) {
+      var pc = pcN(note(r)), hit = ROOTS[q].filter(function (x) { return pcN(note(x)) === pc; })[0];
+      if (hit && out.indexOf(hit) < 0) out.push(hit);
+    });
+    return out;
+  }
+
+  /* ---------- climbing: easy first, a notch up per run of clean answers ---------- */
+  // A gen with tiers starts every run on the first one. CLIMB_N clean answers in
+  // a row (no hint, not a play-along) move you up a notch; a miss moves you
+  // down one. In a level, clearing the top tier brings the boss.
+  var CLIMB_N = { int: 4, chord: 3, prog: 6 };
+  var REVIEW_P = 0.3;                          // share of questions from tiers below
+  function tiered() { return !!(run && run.cfg.gen.tiers && !run.lad); }
+  function climbNeed() { var g = run.cfg.gen; return g.tiers[run.tier].n || CLIMB_N[g.type]; }
+  // The gen for one question: the base gen with one tier's fields on top. Help on
+  // the sign follows the tier you're on, even for a review question.
+  function genNow() {
+    var gen = run.cfg.gen;
+    if (!tiered()) return gen;
+    var t = run.tier > 0 && Math.random() < REVIEW_P ? rand(run.tier) : run.tier, o = {}, k;
+    for (k in gen) if (k !== "tiers") o[k] = gen[k];
+    for (k in gen.tiers[t]) o[k] = gen.tiers[t][k];
+    o.wheels = "wheels" in gen.tiers[run.tier] ? gen.tiers[run.tier].wheels : gen.wheels;
+    return o;
+  }
+  // Returns a line to add to the message, or "".
+  function climb(ok) {
+    if (!tiered()) return "";
+    var tiers = run.cfg.gen.tiers;
+    if (!ok) {
+      run.climb = 0;
+      if (run.tier === 0) return "";
+      run.tier--; run.topClear = false;
+      banner = { text: "NOTCH DOWN", sub: tiers[run.tier].name, t: 0, dur: 1.1, col: "#ef7d57" };
+      return " Back down a notch: <b>" + tiers[run.tier].name + "</b>.";
+    }
+    if (run.hinted || cur.help === "full") return "";
+    if (++run.climb < climbNeed()) return "";
+    run.climb = 0;
+    if (run.tier === tiers.length - 1) { run.topClear = true; return ""; }
+    run.tier++;
+    banner = { text: "NOTCH UP!", sub: tiers[run.tier].name, t: 0, dur: 1.3, col: "#a7f070" };
+    sfx.heart();
+    return " &mdash; up a notch: <b>" + tiers[run.tier].name + "</b>!";
+  }
+
   // Each monster carries a queue of prompts; its HP is the queue length.
   function makeQueue(isBoss) {
     var cfg = run.cfg, gen = cfg.gen, q = [];
@@ -2709,11 +2809,12 @@
       (isBoss ? pickN(gen.roots, cfg.bossHp || 2) : [pickFresh(gen.roots, function (r) { return queueWeight(chamQueue(r)); })])
         .forEach(function (r) { q = q.concat(chamQueue(r)); });
     } else if (gen.type === "prog") {
-      (isBoss ? (cfg.bossKeys || pickN(gen.keys, 2)) : [pickFresh(gen.keys, progMk(gen))]).forEach(function (k) { q = q.concat(progQueue(k, gen)); });
+      var pg = genNow();
+      (isBoss ? (cfg.bossKeys || pickN(pg.keys, 2)) : [pickFresh(pg.keys, progMk(pg))]).forEach(function (k) { q = q.concat(progQueue(k, pg)); });
     } else {
       for (var i = 0, n = isBoss ? cfg.bossHp : 1; i < n; i++) {
         var p, g = 0;
-        do { p = single(gen); } while (++g < 24 && p.key === run.lastKey);
+        do { p = single(genNow()); } while (++g < 24 && p.key === run.lastKey);
         run.lastKey = p.key;
         q.push(p);
       }
@@ -2754,13 +2855,13 @@
     locked = false; verdict = null; revealed = false; answer = null;
     run.hinted = false; run.paceEnd = 0;
     var b = boxOf(cur.mk);
-    cur.help = save.help !== "fade" ? "none" : b <= 0 ? "full" : b === 1 ? "flash" : "none";
+    cur.help = save.help !== "fade" || hintMode === "off" ? "none" : b <= 0 ? "full" : b === 1 ? "flash" : "none";
     if (cur.help !== "none") { revealed = true; cur.showSym = true; }
     if (cur.help === "flash") {
       var me = cur;
       later(1.3, function () {
         if (cur !== me || verdict !== null || run.hinted) return;
-        if (hintOn) { showHint(); return; }
+        if (hintMode === "on") { showHint(); return; }
         revealed = false; cur.showSym = false; paintKeys();
       });
     }
@@ -2773,7 +2874,7 @@
     // A held root counts, except when both keys must be struck at once.
     if (cur.kind === "int" && save.shape !== "together") for (var h2 in held) if (pcOf(+h2) === cur.rootPc) cur.botM = +h2;
     $("kbHow").textContent = cur.kind === "int" ? "blue key = where you start" : "any order, any octave";
-    if (hintOn && cur.help === "none") { showHint(prefix); return; }
+    if (hintMode === "on" && cur.help === "none") { showHint(prefix); return; }
     say((prefix || "") + (cur.help === "full" && !again ? guidedMsg() : (cur.help === "flash" && !again ? "Quick look &mdash; then from memory! " : "") + promptMsg(again)));
     paintKeys();
   }
@@ -2867,6 +2968,7 @@
     if (st.streak > st.best) st.best = st.streak;
     cur.boxBefore = boxOf(cur.mk);
     remember(cur, true, ms);
+    run.notch = climb(true);
     paintKeys();
     hit(ms);
   }
@@ -2874,6 +2976,7 @@
     locked = true; verdict = "wrong"; answer = n;
     run.stats.asked++; run.stats.streak = 0;
     remember(cur, false, 0);
+    run.notch = climb(false);
     paintKeys();
     miss(n);
   }
@@ -2913,7 +3016,7 @@
     else if (box >= 4 && c.boxBefore < 4) { msg += " &mdash; <b>fluent!</b>"; floater("FLUENT!", hero.x + 14, GROUND - 46, "#a7f070", 8); }
     else if (fast) msg += " &mdash; lightning fast!";
     else if (box <= 3) msg += ". Now a little faster (under " + (FLUENT_MS[task()] / 1000) + "s) to lock it in.";
-    say(msg);
+    say(msg + run.notch);
   }
   function impact(m, gain, fast, mult, chain) {
     if (!run || run.monster !== m) return;
@@ -2967,7 +3070,8 @@
     }
     run.kills++; run.total++;
     persist();
-    var bossDue = run.cfg.level >= 0 ? run.kills >= run.cfg.count && !run.bossSpawned : run.total % run.cfg.count === 0;
+    var bossDue = run.cfg.level >= 0 ? (tiered() ? run.topClear : run.kills >= run.cfg.count) && !run.bossSpawned
+      : run.total % run.cfg.count === 0;
     if (bossDue) later(0.6 + gap, bossIntro);
     else later(0.3 + gap, function () { spawnMonster(false); });
   }
@@ -3024,7 +3128,7 @@
     later(0.18, hurtHero);
     if (cur.kind === "int") { tone(cur.rootMidi, 0.5, 0.4); tone(cur.ansMidi, 0.85, 0.4); tone(cur.rootMidi, 1.3, 0.9, 0.1); tone(cur.ansMidi, 1.3, 0.9, 0.1); }
     else chordTone(revealNotes(), 0.5, 1.2);
-    say(missMsg(n));
+    say(missMsg(n) + run.notch);
     if (dead) { later(1.1, gameOver); return; }
     if (save.pace < 0) {
       $("nextBtn").hidden = false;
@@ -3166,6 +3270,7 @@
       el.className = el.dataset.kind + (c ? " " + c : "");
       tagEls[m].textContent = tags[n] !== undefined ? tags[n] : "";
     }
+    syncHint();
   }
   kb.addEventListener("pointerdown", function (e) {
     var n = e.target.dataset && e.target.dataset.note;
@@ -3365,10 +3470,10 @@
       });
       tabs.appendChild(b);
     });
-    [["freeBtn", "practice"], ["setBtn", "settings"]].forEach(function (x) {
-      var el = $(x[0]), bd = el.querySelector(".badge");
-      if (isNew(x[1]) && !bd) el.insertAdjacentHTML("beforeend", '<span class="badge">NEW</span>');
-      else if (!isNew(x[1]) && bd) bd.remove();
+    [["freeBtn", ["practice", "climb"]], ["setBtn", ["settings"]]].forEach(function (x) {
+      var el = $(x[0]), bd = el.querySelector(".badge"), fresh = x[1].some(isNew);
+      if (fresh && !bd) el.insertAdjacentHTML("beforeend", '<span class="badge">NEW</span>');
+      else if (!fresh && bd) bd.remove();
     });
     var ch = CHAPTERS[save.chapter];
     $("chapterSub").innerHTML = "<b>" + ch.title + "</b> &middot; " + ch.sub;
@@ -3639,7 +3744,7 @@
     [].forEach.call(document.querySelectorAll('[data-new="' + k + '"]'), function (el) { el.hidden = !isNew(k); });
     seenNew(k);
   }
-  $("freeBtn").addEventListener("click", function () { sfx.click(); openNews("practice"); showOverlay("free"); });
+  $("freeBtn").addEventListener("click", function () { sfx.click(); openNews("practice"); openNews("climb"); showOverlay("free"); });
   $("bookBtn").addEventListener("click", function () { sfx.click(); showOverlay("book"); });
   $("shopBtn").addEventListener("click", function () { sfx.click(); showOverlay("shop"); });
   $("setBtn").addEventListener("click", function () { sfx.click(); disarmReset(); openNews("settings"); showOverlay("settings"); });
@@ -3702,8 +3807,11 @@
     sfx.click();
     openLesson(run.cfg.level, "play");
   });
-  // HINT is a toggle: while it's on, every new question shows its answer.
-  function syncHint() { $("hintBtn").setAttribute("aria-pressed", hintOn ? "true" : "false"); }
+  // HINT flips what you see. "auto" follows the fading help (new items show
+  // their answer), "on" shows every answer, "off" hides them all, new ones too.
+  // The button reads as pressed whenever the answer is showing.
+  function hintShowing() { return hintMode === "on" || (hintMode === "auto" && !!cur && mode === "play" && verdict === null && revealed); }
+  function syncHint() { $("hintBtn").setAttribute("aria-pressed", hintShowing() ? "true" : "false"); }
   function showHint(prefix) {
     prefix = prefix || "";
     revealed = true; run.hinted = true; cur.showSym = true;
@@ -3720,14 +3828,16 @@
   }
   $("hintBtn").addEventListener("click", function () {
     if (!run || mode !== "play" || paused) return;
-    hintOn = !hintOn; syncHint();
-    if (!cur || locked || verdict !== null) return;      // takes effect on the next question
-    if (hintOn) { if (!revealed) showHint(); }
-    else if (run.hinted && cur.help !== "full") {         // hide it again; this one still pays no coins
-      revealed = false; cur.showSym = false;
-      paintKeys();
-      say(promptMsg(false));
+    hintMode = hintShowing() ? "off" : "on";
+    if (cur && !locked && verdict === null) {             // otherwise it starts with the next question
+      if (hintMode === "on") { if (!revealed) showHint(); }
+      else if (revealed) {                               // hide it; a hinted one still pays no coins
+        revealed = false; cur.showSym = false;
+        if (cur.help === "full") cur.help = "flash";      // seen, now from memory
+        say(promptMsg(false));
+      }
     }
+    paintKeys();
   });
   $("skipBtn").addEventListener("click", function () {
     if (!run || !cur || locked) return;
