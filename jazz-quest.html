@@ -75,7 +75,7 @@
      (aspect-ratio lets content win) and the canvas covers the taller box. */
   .screen {
     position: relative; display: grid; aspect-ratio: 16 / 9; margin: 0 auto;
-    width: min(100%, calc((100dvh - 320px) * 16 / 9)); min-width: min(100%, 320px);
+    width: min(100%, calc((var(--vh, 100dvh) - 320px) * 16 / 9)); min-width: min(100%, 320px);
     box-shadow: 0 0 0 4px var(--night), 0 0 0 8px var(--slate); background: #111;
   }
   #game { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -174,7 +174,7 @@
   .book .chip.sheet, .chip.preset { background: var(--teal); color: var(--white); box-shadow: inset -2px -3px 0 var(--night); }
 
   /* ---- under the screen ---- */
-  .hud-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 40px; width: min(100%, calc((100dvh - 320px) * 16 / 9)); min-width: min(100%, 320px); margin: 4px auto 0; }
+  .hud-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 40px; width: min(100%, calc((var(--vh, 100dvh) - 320px) * 16 / 9)); min-width: min(100%, 320px); margin: 4px auto 0; }
   .msg { margin: 0; flex: 1 1 260px; font-family: var(--vt); font-size: 22px; line-height: 1.1; color: var(--white); min-height: 1.1em; }
   .msg b { color: var(--gold); font-weight: normal; }
   .ac { font-family: "Noto Music", serif; font-size: 1.6em; line-height: 0; vertical-align: -.1em; }
@@ -227,7 +227,7 @@
   @media (max-height: 560px) and (orientation: landscape) {
     .kb { height: 96px; }
     .kb .w .tg { bottom: 22px; }
-    .screen, .hud-row { width: min(100%, calc((100dvh - 190px) * 16 / 9)); }
+    .screen, .hud-row { width: min(100%, calc((var(--vh, 100dvh) - 190px) * 16 / 9)); }
   }
 </style>
 
@@ -3878,6 +3878,21 @@
     document.addEventListener("fullscreenchange", syncFs);
     document.addEventListener("webkitfullscreenchange", syncFs);
   }
+
+  /* The layout sizes from --vh, measured here, rather than trusting 100dvh: Android
+     Chrome often keeps dvh at its pre-fullscreen value or reads it mid-transition,
+     leaving the page taller than the screen. Re-measure a few times after a change. */
+  var fitTimers = [];
+  function fitViewport() { docEl.style.setProperty("--vh", window.innerHeight + "px"); }
+  function refit() {
+    fitViewport();
+    fitTimers.forEach(clearTimeout);
+    fitTimers = [60, 200, 500, 1000].map(function (ms) { return setTimeout(fitViewport, ms); });
+  }
+  ["resize", "orientationchange"].forEach(function (ev) { window.addEventListener(ev, refit); });
+  ["fullscreenchange", "webkitfullscreenchange"].forEach(function (ev) { document.addEventListener(ev, refit); });
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", refit);
+  fitViewport();
 
   if (/[?&]test\b/.test(location.search)) {
     window.JQ = {
